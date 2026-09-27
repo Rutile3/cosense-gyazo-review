@@ -1,7 +1,7 @@
 (function () {
     'use strict';
 
-    // Cosenseエクスポートの解析と、画像一覧の検索・ページ分割を担当する。
+    // Cosenseエクスポートの解析、一覧計算、表示結果検証、CSV生成を担当する。
 
     /**
      * @typedef {Object} CosenseExport
@@ -18,14 +18,29 @@
      */
 
     /**
-     * @typedef {'all'|'untested'|'available'|'unavailable'|'timeout'} DisplayTestFilter
+     * @typedef {'untested'|'available'|'unavailable'|'timeout'} DisplayTestResultName
+     */
+
+    /**
+     * @typedef {'all'|DisplayTestResultName} DisplayTestFilter
+     */
+
+    /**
+     * @typedef {Object} DisplayTestResultDefinition
+     * @property {string} label
+     * @property {boolean} stored
+     * @property {boolean} includeInSummary
+     */
+
+    /**
+     * @typedef {'png'|'jpg'|'gif'|'mp4'} DisplayTestFormat
      */
 
     /**
      * @typedef {Object} DisplayTestResult
      * @property {'available'|'unavailable'|'timeout'} result
      * @property {string} testedAt
-     * @property {'png'|'jpg'|'gif'|'mp4'} [format]
+     * @property {DisplayTestFormat} [format]
      */
 
     /**
@@ -37,7 +52,63 @@
      * @property {number} start
      */
 
+    /** @type {Readonly<Record<DisplayTestResultName, Readonly<DisplayTestResultDefinition>>>} */
+    const DISPLAY_TEST_RESULT_CONFIG = Object.freeze({
+        untested: Object.freeze({ label: '未判定', stored: false, includeInSummary: true }),
+        available: Object.freeze({ label: '表示できた', stored: true, includeInSummary: true }),
+        unavailable: Object.freeze({ label: '表示できない', stored: true, includeInSummary: true }),
+        timeout: Object.freeze({ label: '時間切れ', stored: true, includeInSummary: true })
+    });
+    const DISPLAY_TEST_SUMMARY_KEYS = Object.freeze(
+        Object.keys(DISPLAY_TEST_RESULT_CONFIG).filter(key => DISPLAY_TEST_RESULT_CONFIG[key].includeInSummary)
+    );
+    const DISPLAY_TEST_OUTCOME_KEYS = Object.freeze(
+        Object.keys(DISPLAY_TEST_RESULT_CONFIG).filter(key => DISPLAY_TEST_RESULT_CONFIG[key].stored)
+    );
+    /** @type {ReadonlyArray<DisplayTestFormat>} */
+    const DISPLAY_FORMATS = Object.freeze(['png', 'jpg', 'gif', 'mp4']);
+    const CSV_HEADER = Object.freeze(['画像ID', '確認用URL', '表示テスト結果', '検査日時', '掲載元ページ']);
+    const CSV_FORMULA_PREFIX_PATTERN = /^[=+\-@\t\r\n]/;
     const GYAZO_PATTERN = /https?:\/\/(?:i\.)?gyazo\.com\/([a-f0-9]{32})(?![a-f0-9])(?:\.[a-z0-9]+)?(?:[?#][^\s\]\[<>"']*)?/gi;
+
+    /**
+     * 表示テスト結果名に対応する定義を返す。
+     * @param {unknown} result
+     * @returns {DisplayTestResultDefinition|null}
+     */
+    function getDisplayTestResultDefinition(result) {
+        if (typeof result !== 'string') return null;
+        if (!Object.prototype.hasOwnProperty.call(DISPLAY_TEST_RESULT_CONFIG, result)) return null;
+        return DISPLAY_TEST_RESULT_CONFIG[/** @type {DisplayTestResultName} */ (result)];
+    }
+
+    /**
+     * @param {unknown} result
+     * @returns {boolean}
+     */
+    function isStoredDisplayTestResult(result) {
+        return getDisplayTestResultDefinition(result)?.stored === true;
+    }
+
+    /**
+     * @param {readonly string[]} keys
+     * @returns {Record<string, number>}
+     */
+    function createResultCounts(keys) {
+        return Object.fromEntries(keys.map(key => [key, 0]));
+    }
+
+    /**
+     * localStorageから読み込んだ値が表示テスト結果として有効か検証する。
+     * @param {unknown} value
+     * @returns {value is DisplayTestResult}
+     */
+    function isValidDisplayTestResult(value) {
+        if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+        const candidate = /** @type {Partial<DisplayTestResult>} */ (value);
+        const hasValidFormat = candidate.format === undefined || DISPLAY_FORMATS.includes(candidate.format);
+        return isStoredDisplayTestResult(candidate.result) && typeof candidate.testedAt === 'string' && hasValidFormat;
+    }
 
     /**
      * Cosenseエクスポートとして処理できる最小限の構造か検証する。
@@ -130,11 +201,74 @@
         return { items: imageItems.slice(start, start + pageSize), page, pageSize, totalPages, start };
     }
 
+    /**
+     * 表計算ソフトで数式として解釈され得るCSVセルの先頭を無害化する。
+     * @param {unknown} value
+     * @returns {string}
+     */
+    function sanitizeCsvCell(value) {
+        const text = String(value);
+        return CSV_FORMULA_PREFIX_PATTERN.test(text) ? `'${text}` : text;
+    }
+
+    /**
+     * CSVセルを無害化し、引用符で囲む。
+     * @param {unknown} value
+     * @returns {string}
+     */
+    function csvEscape(value) {
+        return `"${sanitizeCsvCell(value).replace(/"/g, '""')}"`;
+    }
+
+    /**
+     * 画像一覧と表示テスト結果からCSVのデータ行を生成する。
+     * @param {GyazoImage[]} imageItems
+     * @param {Record<string, DisplayTestResult>} testResults
+     * @returns {string[][]}
+     */
+    function createCsvRows(imageItems, testResults) {
+        return imageItems.map(image => {
+            const testResult = testResults[image.id];
+            const resultDefinition = getDisplayTestResultDefinition(testResult?.result) || DISPLAY_TEST_RESULT_CONFIG.untested;
+            return [
+                image.id,
+                image.url,
+                resultDefinition.label,
+                testResult ? testResult.testedAt : '',
+                Array.from(new Set(image.sources.map(source => source.pageTitle))).join(' / ')
+            ];
+        });
+    }
+
+    /**
+     * CSVのデータ行を、Excelで開きやすいBOM付きUTF-8の文字列へ変換する。
+     * @param {string[][]} rows
+     * @returns {string}
+     */
+    function createCsvText(rows) {
+        return '\uFEFF' + [
+            CSV_HEADER,
+            ...rows
+        ].map(row => row.map(csvEscape).join(',')).join('\r\n');
+    }
+
     window.CosenseGyazoReviewCore = Object.freeze({
+        DISPLAY_TEST_RESULT_CONFIG,
+        DISPLAY_TEST_SUMMARY_KEYS,
+        DISPLAY_TEST_OUTCOME_KEYS,
+        DISPLAY_FORMATS,
         validateExport,
         getCosensePageUrl,
         extractImages,
         filterImages,
-        paginateImages
+        paginateImages,
+        getDisplayTestResultDefinition,
+        isStoredDisplayTestResult,
+        createResultCounts,
+        isValidDisplayTestResult,
+        sanitizeCsvCell,
+        csvEscape,
+        createCsvRows,
+        createCsvText
     });
 }());

@@ -3,11 +3,23 @@
 
     if (!window.CosenseGyazoReviewCore) throw new Error('core.jsをapp.jsより先に読み込んでください。');
     const {
+        DISPLAY_TEST_RESULT_CONFIG,
+        DISPLAY_TEST_SUMMARY_KEYS,
+        DISPLAY_TEST_OUTCOME_KEYS,
+        DISPLAY_FORMATS,
         validateExport,
         getCosensePageUrl,
         extractImages,
         filterImages,
-        paginateImages
+        paginateImages,
+        getDisplayTestResultDefinition,
+        isStoredDisplayTestResult,
+        createResultCounts,
+        isValidDisplayTestResult,
+        sanitizeCsvCell,
+        csvEscape,
+        createCsvRows,
+        createCsvText
     } = window.CosenseGyazoReviewCore;
 
     /**
@@ -22,21 +34,6 @@
      * @property {string} id 32桁のGyazo画像ID
      * @property {string} url 確認用のGyazoページURL
      * @property {Array<{pageTitle: string, lineText: string, lineNumber: number, pageUrl: string}>} sources
-     */
-
-    /**
-     * @typedef {'untested'|'available'|'unavailable'|'timeout'} DisplayTestResultName
-     */
-
-    /**
-     * @typedef {'all'|DisplayTestResultName} DisplayTestFilter
-     */
-
-    /**
-     * @typedef {Object} DisplayTestResultDefinition
-     * @property {string} label
-     * @property {boolean} stored
-     * @property {boolean} includeInSummary
      */
 
     /**
@@ -94,26 +91,9 @@
      */
 
     // 表示テストはHTTPステータスではなく、ブラウザのメディア読込イベントで判定する。
-    /** @type {Readonly<Record<DisplayTestResultName, Readonly<DisplayTestResultDefinition>>>} */
-    const DISPLAY_TEST_RESULT_CONFIG = Object.freeze({
-        untested: Object.freeze({ label: '未判定', stored: false, includeInSummary: true }),
-        available: Object.freeze({ label: '表示できた', stored: true, includeInSummary: true }),
-        unavailable: Object.freeze({ label: '表示できない', stored: true, includeInSummary: true }),
-        timeout: Object.freeze({ label: '時間切れ', stored: true, includeInSummary: true })
-    });
-    const DISPLAY_TEST_SUMMARY_KEYS = Object.freeze(
-        Object.keys(DISPLAY_TEST_RESULT_CONFIG).filter(key => DISPLAY_TEST_RESULT_CONFIG[key].includeInSummary)
-    );
-    const DISPLAY_TEST_OUTCOME_KEYS = Object.freeze(
-        Object.keys(DISPLAY_TEST_RESULT_CONFIG).filter(key => DISPLAY_TEST_RESULT_CONFIG[key].stored)
-    );
-    /** @type {ReadonlyArray<DisplayTestFormat>} */
-    const DISPLAY_FORMATS = Object.freeze(['png', 'jpg', 'gif', 'mp4']);
     const TEST_STORAGE_PREFIX = 'cosense-gyazo-review:display-tests:v1:';
     const TEST_TIMEOUT_MS = 12000;
     const TEST_CONCURRENCY = 3;
-    const CSV_HEADER = Object.freeze(['画像ID', '確認用URL', '表示テスト結果', '検査日時', '掲載元ページ']);
-    const CSV_FORMULA_PREFIX_PATTERN = /^[=+\-@\t\r\n]/;
     /**
      * 必須のDOM要素をIDで取得し、HTMLとの不整合を初期化時に検出する。
      * @param {string} id
@@ -270,33 +250,6 @@
     }
 
     /**
-     * 表示テスト結果名に対応する定義を返す。
-     * @param {unknown} result
-     * @returns {DisplayTestResultDefinition|null}
-     */
-    function getDisplayTestResultDefinition(result) {
-        if (typeof result !== 'string') return null;
-        if (!Object.prototype.hasOwnProperty.call(DISPLAY_TEST_RESULT_CONFIG, result)) return null;
-        return DISPLAY_TEST_RESULT_CONFIG[/** @type {DisplayTestResultName} */ (result)];
-    }
-
-    /**
-     * @param {unknown} result
-     * @returns {boolean}
-     */
-    function isStoredDisplayTestResult(result) {
-        return getDisplayTestResultDefinition(result)?.stored === true;
-    }
-
-    /**
-     * @param {readonly string[]} keys
-     * @returns {Record<string, number>}
-     */
-    function createResultCounts(keys) {
-        return Object.fromEntries(keys.map(key => [key, 0]));
-    }
-
-    /**
      * @param {Record<string, number>} counts
      * @returns {string}
      */
@@ -304,18 +257,6 @@
         return DISPLAY_TEST_OUTCOME_KEYS
             .map(key => `${DISPLAY_TEST_RESULT_CONFIG[key].label} ${counts[key]}`)
             .join('、');
-    }
-
-    /**
-     * localStorageから読み込んだ値が表示テスト結果として有効か検証する。
-     * @param {unknown} value
-     * @returns {value is DisplayTestResult}
-     */
-    function isValidDisplayTestResult(value) {
-        if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
-        const candidate = /** @type {Partial<DisplayTestResult>} */ (value);
-        const hasValidFormat = candidate.format === undefined || DISPLAY_FORMATS.includes(candidate.format);
-        return isStoredDisplayTestResult(candidate.result) && typeof candidate.testedAt === 'string' && hasValidFormat;
     }
 
     /**
@@ -850,57 +791,6 @@
         } finally {
             if (isCurrentFileLoad(loadId)) elements.fileInput.value = '';
         }
-    }
-
-    /**
-     * 表計算ソフトで数式として解釈され得るCSVセルの先頭を無害化する。
-     * @param {unknown} value
-     * @returns {string}
-     */
-    function sanitizeCsvCell(value) {
-        const text = String(value);
-        return CSV_FORMULA_PREFIX_PATTERN.test(text) ? `'${text}` : text;
-    }
-
-    /**
-     * CSVセルを無害化し、引用符で囲む。
-     * @param {unknown} value
-     * @returns {string}
-     */
-    function csvEscape(value) {
-        return `"${sanitizeCsvCell(value).replace(/"/g, '""')}"`;
-    }
-
-    /**
-     * 画像一覧と表示テスト結果からCSVのデータ行を生成する。
-     * @param {GyazoImage[]} imageItems
-     * @param {Record<string, DisplayTestResult>} testResults
-     * @returns {string[][]}
-     */
-    function createCsvRows(imageItems, testResults) {
-        return imageItems.map(image => {
-            const testResult = testResults[image.id];
-            const resultDefinition = getDisplayTestResultDefinition(testResult?.result) || DISPLAY_TEST_RESULT_CONFIG.untested;
-            return [
-                image.id,
-                image.url,
-                resultDefinition.label,
-                testResult ? testResult.testedAt : '',
-                Array.from(new Set(image.sources.map(source => source.pageTitle))).join(' / ')
-            ];
-        });
-    }
-
-    /**
-     * CSVのデータ行を、Excelで開きやすいBOM付きUTF-8の文字列へ変換する。
-     * @param {string[][]} rows
-     * @returns {string}
-     */
-    function createCsvText(rows) {
-        return '\uFEFF' + [
-            CSV_HEADER,
-            ...rows
-        ].map(row => row.map(csvEscape).join(',')).join('\r\n');
     }
 
     /**
