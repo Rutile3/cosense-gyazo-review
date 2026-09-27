@@ -16,6 +16,19 @@
      */
 
     /**
+     * @typedef {'all'|'untested'|'available'|'unavailable'|'timeout'} DisplayTestFilter
+     */
+
+    /**
+     * @typedef {Object} PaginatedImages
+     * @property {GyazoImage[]} items
+     * @property {number} page
+     * @property {number} pageSize
+     * @property {number} totalPages
+     * @property {number} start
+     */
+
+    /**
      * @typedef {'png'|'jpg'|'gif'|'mp4'} DisplayTestFormat
      */
 
@@ -321,31 +334,42 @@
 
     /**
      * 検索語と表示テスト結果の条件に一致する画像を返す。
+     * @param {GyazoImage[]} imageItems
+     * @param {Record<string, DisplayTestResult>} testResults
+     * @param {string} query
+     * @param {DisplayTestFilter} testResultFilter
      * @returns {GyazoImage[]}
      */
-    function getFilteredImages() {
-        const query = elements.search.value.trim().toLocaleLowerCase('ja');
-        const testResult = elements.testResultFilter.value;
-        return state.images.filter(image => {
-            const imageResult = state.displayTestResults[image.id]?.result || 'untested';
-            if (testResult !== 'all' && imageResult !== testResult) return false;
-            if (!query) return true;
-            return [image.id, ...image.sources.flatMap(source => [source.pageTitle, source.lineText])].join('\n').toLocaleLowerCase('ja').includes(query);
+    function filterImages(imageItems, testResults, query, testResultFilter) {
+        const normalizedQuery = query.trim().toLocaleLowerCase('ja');
+        return imageItems.filter(image => {
+            const imageResult = testResults[image.id]?.result || 'untested';
+            if (testResultFilter !== 'all' && imageResult !== testResultFilter) return false;
+            if (!normalizedQuery) return true;
+            return [image.id, ...image.sources.flatMap(source => [source.pageTitle, source.lineText])].join('\n').toLocaleLowerCase('ja').includes(normalizedQuery);
         });
     }
 
     /**
-     * 現在のページに表示する画像を返す。
-     * @param {GyazoImage[]} [filteredImages] 計算済みの絞り込み結果
-     * @returns {GyazoImage[]}
+     * 指定されたページ番号と表示件数に従って画像を分割する。
+     * @param {GyazoImage[]} imageItems
+     * @param {number|null} requestedPageSize nullの場合は全件表示
+     * @param {number} requestedPage
+     * @returns {PaginatedImages}
      */
-    function getVisibleImages(filteredImages) {
-        const filtered = filteredImages || getFilteredImages();
-        const pageSize = elements.pageSize.value === 'all' ? Math.max(filtered.length, 1) : Number(elements.pageSize.value);
-        const totalPages = Math.max(Math.ceil(filtered.length / pageSize), 1);
-        const page = Math.min(state.currentPage, totalPages);
+    function paginateImages(imageItems, requestedPageSize, requestedPage) {
+        const pageSize = requestedPageSize === null ? Math.max(imageItems.length, 1) : Math.max(requestedPageSize, 1);
+        const totalPages = Math.max(Math.ceil(imageItems.length / pageSize), 1);
+        const page = Math.min(Math.max(requestedPage, 1), totalPages);
         const start = (page - 1) * pageSize;
-        return filtered.slice(start, start + pageSize);
+        return { items: imageItems.slice(start, start + pageSize), page, pageSize, totalPages, start };
+    }
+
+    /** DOMの入力値を純粋な一覧計算へ渡し、現在の表示内容を返す。 */
+    function getCurrentListView() {
+        const filtered = filterImages(state.images, state.displayTestResults, elements.search.value, elements.testResultFilter.value);
+        const requestedPageSize = elements.pageSize.value === 'all' ? null : Number(elements.pageSize.value);
+        return { filtered, ...paginateImages(filtered, requestedPageSize, state.currentPage) };
     }
 
     /**
@@ -354,8 +378,8 @@
      */
     function getBatchTargets() {
         if (elements.testScope.value === 'all') return state.images.slice();
-        const filtered = getFilteredImages();
-        return elements.testScope.value === 'filtered' ? filtered : getVisibleImages(filtered);
+        const view = getCurrentListView();
+        return elements.testScope.value === 'filtered' ? view.filtered : view.items;
     }
     function updateTestScopeButton() {
         if (state.batchRun) return;
@@ -366,24 +390,20 @@
 
     /** 一覧、件数表示、ページャー、絞り込み状態をまとめて再描画する。 */
     function renderList() {
-        const filtered = getFilteredImages();
-        const pageSize = elements.pageSize.value === 'all' ? Math.max(filtered.length, 1) : Number(elements.pageSize.value);
-        const totalPages = Math.max(Math.ceil(filtered.length / pageSize), 1);
-        state.currentPage = Math.min(state.currentPage, totalPages);
-        const start = (state.currentPage - 1) * pageSize;
-        const visible = getVisibleImages(filtered);
-        const fragment = document.createDocumentFragment(); visible.forEach(image => fragment.append(createImageElement(image)));
+        const view = getCurrentListView();
+        state.currentPage = view.page;
+        const fragment = document.createDocumentFragment(); view.items.forEach(image => fragment.append(createImageElement(image)));
         elements.imageList.replaceChildren(fragment);
-        elements.emptyFilter.classList.toggle('d-none', filtered.length !== 0);
-        elements.visibleCount.textContent = filtered.length === 0 ? `0 / ${state.images.length}件` : `${start + 1}〜${start + visible.length} / ${filtered.length}件`;
-        const hidePagination = filtered.length === 0 || elements.pageSize.value === 'all';
+        elements.emptyFilter.classList.toggle('d-none', view.filtered.length !== 0);
+        elements.visibleCount.textContent = view.filtered.length === 0 ? `0 / ${state.images.length}件` : `${view.start + 1}〜${view.start + view.items.length} / ${view.filtered.length}件`;
+        const hidePagination = view.filtered.length === 0 || elements.pageSize.value === 'all';
         elements.paginationControls.forEach(controls => {
             controls.container.classList.toggle('d-none', hidePagination);
-            controls.info.textContent = `${state.currentPage} / ${totalPages}ページ`;
+            controls.info.textContent = `${view.page} / ${view.totalPages}ページ`;
             controls.first.disabled = state.currentPage === 1;
             controls.previous.disabled = state.currentPage === 1;
-            controls.next.disabled = state.currentPage === totalPages;
-            controls.last.disabled = state.currentPage === totalPages;
+            controls.next.disabled = state.currentPage === view.totalPages;
+            controls.last.disabled = state.currentPage === view.totalPages;
         });
         updateTestFilterButtons();
         updateTestScopeButton();
@@ -405,7 +425,7 @@
     }
     function refreshDisplayTestUi(imageId) {
         updateDisplayTestSummary();
-        if (elements.testResultFilter.value !== 'all' || getVisibleImages().some(image => image.id === imageId)) renderList();
+        if (elements.testResultFilter.value !== 'all' || getCurrentListView().items.some(image => image.id === imageId)) renderList();
         else updateTestScopeButton();
     }
 
@@ -688,9 +708,7 @@
     function moveToPreviousPage() { if (state.currentPage > 1) { state.currentPage -= 1; renderList(); } }
     function moveToNextPage() { state.currentPage += 1; renderList(); }
     function moveToLastPage() {
-        const filteredCount = getFilteredImages().length;
-        const pageSize = elements.pageSize.value === 'all' ? Math.max(filteredCount, 1) : Number(elements.pageSize.value);
-        state.currentPage = Math.max(Math.ceil(filteredCount / pageSize), 1);
+        state.currentPage = getCurrentListView().totalPages;
         renderList();
     }
     elements.paginationControls.forEach(controls => {
@@ -700,5 +718,5 @@
         controls.last.addEventListener('click', moveToLastPage);
     });
     elements.exportCsv.addEventListener('click', exportCsv);
-    window.CosenseGyazoReview = Object.freeze({ extractImages, validateExport, getCosensePageUrl, csvEscape });
+    window.CosenseGyazoReview = Object.freeze({ extractImages, validateExport, getCosensePageUrl, filterImages, paginateImages, csvEscape });
 }());
