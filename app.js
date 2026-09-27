@@ -104,6 +104,7 @@
     const TEST_TIMEOUT_MS = 12000;
     const TEST_CONCURRENCY = 3;
     const CSV_HEADER = Object.freeze(['画像ID', '確認用URL', '表示テスト結果', '検査日時', '掲載元ページ']);
+    const CSV_FORMULA_PREFIX_PATTERN = /^[=+\-@\t\r\n]/;
     const GYAZO_PATTERN = /https?:\/\/(?:i\.)?gyazo\.com\/([a-f0-9]{32})(?![a-f0-9])(?:\.[a-z0-9]+)?(?:[?#][^\s\]\[<>"']*)?/gi;
 
     /**
@@ -936,11 +937,22 @@
     }
 
     /**
+     * 表計算ソフトで数式として解釈され得るCSVセルの先頭を無害化する。
+     * @param {unknown} value
+     * @returns {string}
+     */
+    function sanitizeCsvCell(value) {
+        const text = String(value);
+        return CSV_FORMULA_PREFIX_PATTERN.test(text) ? `'${text}` : text;
+    }
+
+    /**
+     * CSVセルを無害化し、引用符で囲む。
      * @param {unknown} value
      * @returns {string}
      */
     function csvEscape(value) {
-        return `"${String(value).replace(/"/g, '""')}"`;
+        return `"${sanitizeCsvCell(value).replace(/"/g, '""')}"`;
     }
 
     /**
@@ -1066,6 +1078,7 @@
         getCosensePageUrl,
         filterImages,
         paginateImages,
+        sanitizeCsvCell,
         csvEscape,
         createCsvRows,
         createCsvText,
