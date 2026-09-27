@@ -1,6 +1,8 @@
 (function () {
     'use strict';
 
+    // 画面状態、DOM更新、結果保存、一括実行、ファイル読み込み、イベント登録を担当する。
+
     if (!window.CosenseGyazoReviewCore) throw new Error('core.jsをapp.jsより先に読み込んでください。');
     const {
         DISPLAY_TEST_RESULT_CONFIG,

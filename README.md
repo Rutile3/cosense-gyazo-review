@@ -2,6 +2,16 @@
 
 Cosense（旧Scrapbox）のプロジェクトエクスポートJSONからGyazo画像を抽出し、ブラウザで表示可否を確認する静的Webツールです。ビルドやサーバーは不要です。
 
+## JavaScriptファイル構成
+
+`index.html`から、次の順番で通常のスクリプトとして読み込みます。この順番により、ローカルサーバーを使わず`index.html`を直接開けます。
+
+1. `core.js`: JSON検証、Gyazo URL抽出、一覧計算、表示結果検証、CSV生成
+2. `display-test.js`: `i.gyazo.com`のメディア読み込み、タイムアウト、キャンセル、表示判定
+3. `app.js`: 画面状態、DOM更新、localStorage、一括実行、ファイル読み込み、イベント登録
+
+`core.js`と`display-test.js`が必要な機能を名前空間へ公開し、最後に読み込む`app.js`が画面操作と連携させます。
+
 ## 使い方
 
 1. `index.html` をブラウザで開きます。
