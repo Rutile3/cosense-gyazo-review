@@ -687,7 +687,26 @@
         if (!isRunning) updateTestScopeButton();
     }
 
-    /** 同時実行数を制限したワーカーで、選択範囲を順番に表示テストする。 */
+    /**
+     * 一括テストの次の対象を取得し、停止されるまで順番に処理する。
+     * @param {BatchRun} run
+     * @returns {Promise<void>}
+     */
+    async function runBatchWorker(run) {
+        while (!run.stopped && run.nextIndex < run.total) {
+            const image = run.targets[run.nextIndex];
+            run.nextIndex += 1;
+            const outcome = await performDisplayTest(image, run.id);
+            if (run.stopped) return;
+            if (DISPLAY_RESULT[outcome]) {
+                run.completed += 1;
+                run.counts[outcome] += 1;
+                updateBatchProgress(run);
+            }
+        }
+    }
+
+    /** 選択範囲と同時実行数を決定し、一括テストの開始から完了までを管理する。 */
     async function startBatchDisplayTest() {
         if (state.batchRun) return;
         const targets = getBatchTargets();
@@ -706,20 +725,8 @@
         setBatchControls(true);
         renderList();
         updateBatchProgress(run);
-        const worker = async () => {
-            while (!run.stopped && run.nextIndex < run.total) {
-                const image = run.targets[run.nextIndex];
-                run.nextIndex += 1;
-                const outcome = await performDisplayTest(image, run.id);
-                if (run.stopped) return;
-                if (DISPLAY_RESULT[outcome]) {
-                    run.completed += 1;
-                    run.counts[outcome] += 1;
-                    updateBatchProgress(run);
-                }
-            }
-        };
-        await Promise.all(Array.from({ length: Math.min(TEST_CONCURRENCY, run.total) }, () => worker()));
+        const workerCount = Math.min(TEST_CONCURRENCY, run.total);
+        await Promise.all(Array.from({ length: workerCount }, () => runBatchWorker(run)));
         if (state.batchRun !== run) return;
         state.batchRun = null;
         setBatchControls(false);
