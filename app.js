@@ -6,7 +6,6 @@
         DISPLAY_TEST_RESULT_CONFIG,
         DISPLAY_TEST_SUMMARY_KEYS,
         DISPLAY_TEST_OUTCOME_KEYS,
-        DISPLAY_FORMATS,
         validateExport,
         getCosensePageUrl,
         extractImages,
@@ -21,6 +20,11 @@
         createCsvRows,
         createCsvText
     } = window.CosenseGyazoReviewCore;
+    if (!window.CosenseGyazoReviewDisplayTest) throw new Error('display-test.jsをapp.jsより先に読み込んでください。');
+    const {
+        getDisplayImageUrl,
+        createMediaTest
+    } = window.CosenseGyazoReviewDisplayTest;
 
     /**
      * @typedef {Object} CosenseExport
@@ -83,16 +87,13 @@
      * @property {number} currentPage
      * @property {number} fileLoadSequence
      * @property {number} sessionVersion
-     * @property {number} requestSequence
      * @property {number} batchSequence
      * @property {BatchRun|null} batchRun
      * @property {Map<string, {requestId: number, runId: number|null, cancel: Function}>} activeTestRequests
      * @property {Set<string>} testingImageIds
      */
 
-    // 表示テストはHTTPステータスではなく、ブラウザのメディア読込イベントで判定する。
     const TEST_STORAGE_PREFIX = 'cosense-gyazo-review:display-tests:v1:';
-    const TEST_TIMEOUT_MS = 12000;
     const TEST_CONCURRENCY = 3;
     /**
      * 必須のDOM要素をIDで取得し、HTMLとの不整合を初期化時に検出する。
@@ -163,7 +164,6 @@
         fileLoadSequence: 0,
         // JSON切り替え時に加算し、古い非同期リクエストの結果を破棄する。
         sessionVersion: 0,
-        requestSequence: 0,
         batchSequence: 0,
         batchRun: null,
         activeTestRequests: new Map(),
@@ -298,18 +298,6 @@
         }
     }
 
-    /**
-     * 表示テスト用のi.gyazo.com URLを生成する。
-     * 再テスト時はキャッシュ回避用クエリを付けるが、画像ID自体は変更しない。
-     * @param {string} id
-     * @param {DisplayTestFormat} format
-     * @param {number|null} cacheBustToken nullの場合は検査用クエリを付けない
-     * @returns {string}
-     */
-    function getDisplayImageUrl(id, format, cacheBustToken) {
-        const base = `https://i.gyazo.com/${id}.${format}`;
-        return cacheBustToken === null ? base : `${base}?cosense_gyazo_review=${Date.now()}-${cacheBustToken}`;
-    }
     function formatTestedAt(value) {
         const date = new Date(value);
         return Number.isNaN(date.getTime()) ? value : date.toLocaleString('ja-JP');
@@ -521,70 +509,6 @@
         updateDisplayTestSummary();
         if (elements.testResultFilter.value !== 'all' || getCurrentListView().items.some(image => image.id === imageId)) renderList();
         else updateTestScopeButton();
-    }
-
-    /**
-     * PNG・JPG・GIF・MP4を並行して読み込み、ブラウザのイベントだけで表示可否を判定する。
-     * 状態の保存や画面更新は行わず、判定結果とキャンセル関数を返す。
-     * @param {string} imageId
-     * @returns {{requestId: number, promise: Promise<MediaTestOutcome>, cancel: Function}}
-     */
-    function createMediaTest(imageId) {
-        const requestId = ++state.requestSequence;
-        const loaders = [];
-        const testUrls = Object.fromEntries(DISPLAY_FORMATS.map(format => [format, getDisplayImageUrl(imageId, format, requestId)]));
-        let cancel = () => {};
-        const promise = new Promise(resolve => {
-            let errorCount = 0;
-            let settled = false;
-            let timer;
-            const finish = (result, format) => {
-                if (settled) return;
-                settled = true;
-                clearTimeout(timer);
-                loaders.forEach(({ element, isVideo }) => {
-                    element.onload = null;
-                    element.onerror = null;
-                    element.onloadedmetadata = null;
-                    if (result === 'available' || result === 'cancelled' || result === 'timeout') {
-                        if (isVideo) {
-                            element.removeAttribute('src');
-                            element.load();
-                        } else {
-                            element.src = '';
-                        }
-                    }
-                });
-                /** @type {MediaTestOutcome} */
-                const outcome = { result };
-                if (format) {
-                    outcome.format = format;
-                    outcome.previewUrl = testUrls[format];
-                }
-                resolve(outcome);
-            };
-            cancel = () => finish('cancelled');
-            DISPLAY_FORMATS.forEach(format => {
-                const isVideo = format === 'mp4';
-                const loader = isVideo ? document.createElement('video') : new Image();
-                loaders.push({ element: loader, isVideo });
-                if (isVideo) {
-                    loader.preload = 'metadata';
-                    loader.muted = true;
-                    loader.playsInline = true;
-                    loader.onloadedmetadata = () => finish('available', format);
-                } else {
-                    loader.onload = () => finish('available', format);
-                }
-                loader.onerror = () => {
-                    errorCount += 1;
-                    if (errorCount === DISPLAY_FORMATS.length) finish('unavailable');
-                };
-                loader.src = testUrls[format];
-            });
-            timer = setTimeout(() => finish('timeout'), TEST_TIMEOUT_MS);
-        });
-        return { requestId, promise, cancel: () => cancel() };
     }
 
     /**
