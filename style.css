@@ -1,22 +1,37 @@
-:root {
-    --brand: rgba(219, 169, 39, .8);
-}
-
-.bg-brand {
-    background: var(--brand);
-}
-
-.avatar {
-    width: 32px;
-    height: 32px;
-    object-fit: cover;
-}
-
-body {
-    background: #efefef;
-}
-
-.mono {
-    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Roboto Mono",
-        "Source Code Pro", "Noto Sans Mono CJK JP", "Noto Sans Mono", monospace;
-}
+:root { --brand: rgba(219, 169, 39, .8); --brand-dark: rgba(180, 133, 20, .9); --border: #d9dee5; --muted: #5f6873; }
+* { box-sizing: border-box; }
+body { margin: 0; color: #20252b; background: #efefef; font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
+.d-none { display: none !important; }
+.btn, .form-control, .form-select { min-height: 2.4rem; padding: .45rem .75rem; border: 1px solid #adb5bd; border-radius: .375rem; font: inherit; }
+.btn { display: inline-block; cursor: pointer; text-decoration: none; text-align: center; }
+.form-control, .form-select { width: 100%; background: #fff; color: inherit; }
+.alert { padding: .75rem 1rem; border: 1px solid var(--border); border-radius: .375rem; background: #fff; }
+.alert-success { background: #dff3e8; } .alert-danger { background: #f8d7da; } .alert-warning { background: #fff3cd; }
+.bg-brand { background: var(--brand); }
+.avatar { width: 32px; height: 32px; object-fit: cover; border-radius: 50%; }
+.card { background: #fff; border: 1px solid var(--border); border-radius: .75rem; }
+.drop-zone { display: flex; min-height: 150px; padding: 1.5rem; flex-direction: column; align-items: center; justify-content: center; gap: .35rem; border: 2px dashed #aab2bc; border-radius: .75rem; background: #fafbfc; text-align: center; cursor: pointer; transition: .15s; }
+.drop-zone:hover, .drop-zone:focus, .drop-zone.is-dragging { border-color: var(--brand); background: #fff8e8; outline: none; }
+.drop-zone-title { font-size: 1.05rem; font-weight: 700; }
+.btn-brand { color: #fff; background: var(--brand); border-color: var(--brand); }
+.btn-brand:hover, .btn-brand:focus { color: #fff; background: var(--brand-dark); border-color: var(--brand-dark); }
+.notice { padding: 1rem 1.15rem; border-left: 5px solid var(--brand); border-radius: .35rem; background: #fff4d6; }
+.summary-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: .75rem; }
+.summary-card { padding: 1rem; border: 1px solid var(--border); border-top: 4px solid #65707c; border-radius: .6rem; background: #fff; }
+.summary-card span, .summary-card strong { display: block; }
+.summary-card span { color: var(--muted); font-size: .85rem; }
+.summary-card strong { margin-top: .2rem; font-size: 1.7rem; }
+.status-completed { border-top-color: #198754; } .status-pending { border-top-color: #e6a100; } .status-excluded { border-top-color: #6f42c1; }
+.image-list { display: grid; }
+.image-item { display: grid; grid-template-columns: minmax(0, 1fr) 190px; gap: 1rem 1.5rem; padding: 1.25rem; border-bottom: 1px solid var(--border); }
+.image-item:last-child { border-bottom: 0; }
+.image-id { overflow-wrap: anywhere; font: .9rem ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+.source-list { margin: .8rem 0 0; padding: 0; list-style: none; }
+.source-item { margin-top: .45rem; padding: .65rem .75rem; border-radius: .4rem; background: #f5f6f8; }
+.source-line { display: block; margin-top: .25rem; color: var(--muted); overflow-wrap: anywhere; white-space: pre-wrap; }
+.item-actions { display: flex; flex-direction: column; align-items: stretch; gap: .75rem; }
+.status-select { border-left-width: 5px; }
+.status-select[data-status="unchecked"] { border-left-color: #65707c; } .status-select[data-status="completed"] { border-left-color: #198754; } .status-select[data-status="pending"] { border-left-color: #e6a100; } .status-select[data-status="excluded"] { border-left-color: #6f42c1; }
+.empty-state { padding: 3rem 1rem; color: var(--muted); text-align: center; }
+@media (max-width: 767.98px) { .summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .summary-card:first-child { grid-column: 1 / -1; } .image-item { grid-template-columns: 1fr; } }
+@media (max-width: 420px) { .navbar-brand { max-width: 75%; font-size: 1rem; white-space: normal; } }

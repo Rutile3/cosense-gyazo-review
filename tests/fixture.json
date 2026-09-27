@@ -1,0 +1,14 @@
+{
+    "name": "sample-project",
+    "displayName": "架空のサンプルプロジェクト",
+    "pages": [
+        { "title": "架空のページA", "lines": [
+            { "text": "[https://gyazo.com/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa]" },
+            { "text": "画像 https://i.gyazo.com/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.png?example=1" }
+        ] },
+        { "title": "架空のページB", "lines": [
+            "重複 https://i.gyazo.com/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.jpg",
+            { "text": "対象外 https://example.com/cccccccccccccccccccccccccccccccc" }
+        ] }
+    ]
+}
