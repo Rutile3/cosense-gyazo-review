@@ -182,3 +182,8 @@
 - localStorageから読み込んだ表示テスト結果1件の検証を`isValidDisplayTestResult()`へ分離した。
 - 結果名、検査日時、画像形式に加えてオブジェクト形式も確認し、不正な保存値を除外しやすくした。
 - 検証関数をテスト用公開APIへ追加した。
+
+## 2026-09-28 必須DOM要素の存在確認
+
+- `document.getElementById()`による要素取得を`getRequiredElement()`へ集約した。
+- 必須要素が見つからない場合は、対象IDとHTML・JavaScriptの確認を促すエラーを初期化時に出すようにした。

@@ -86,50 +86,61 @@
     const CSV_HEADER = Object.freeze(['画像ID', '確認用URL', '表示テスト結果', '検査日時', '掲載元ページ']);
     const GYAZO_PATTERN = /https?:\/\/(?:i\.)?gyazo\.com\/([a-f0-9]{32})(?![a-f0-9])(?:\.[a-z0-9]+)?(?:[?#][^\s\]\[<>"']*)?/gi;
 
+    /**
+     * 必須のDOM要素をIDで取得し、HTMLとの不整合を初期化時に検出する。
+     * @param {string} id
+     * @returns {HTMLElement}
+     */
+    function getRequiredElement(id) {
+        const element = document.getElementById(id);
+        if (!element) throw new Error(`必要な画面要素（#${id}）が見つかりません。index.htmlとapp.jsのIDを確認してください。`);
+        return element;
+    }
+
     // DOM参照を一か所に集約し、描画処理で同じ要素を再検索しない。
     const elements = {
-        fileInput: document.getElementById('file-input'),
-        dropZone: document.getElementById('drop-zone'),
-        inputExpanded: document.getElementById('input-expanded'),
-        inputCompact: document.getElementById('input-compact'),
-        inputSummary: document.getElementById('input-summary'),
-        chooseAnotherFile: document.getElementById('choose-another-file'),
-        message: document.getElementById('message'),
-        workspace: document.getElementById('workspace'),
-        projectHeading: document.getElementById('project-heading'),
-        imageList: document.getElementById('image-list'),
-        emptyFilter: document.getElementById('empty-filter'),
-        search: document.getElementById('search'),
-        testResultFilter: document.getElementById('test-result-filter'),
-        pageSize: document.getElementById('page-size'),
+        fileInput: getRequiredElement('file-input'),
+        dropZone: getRequiredElement('drop-zone'),
+        inputExpanded: getRequiredElement('input-expanded'),
+        inputCompact: getRequiredElement('input-compact'),
+        inputSummary: getRequiredElement('input-summary'),
+        chooseAnotherFile: getRequiredElement('choose-another-file'),
+        message: getRequiredElement('message'),
+        workspace: getRequiredElement('workspace'),
+        projectHeading: getRequiredElement('project-heading'),
+        imageList: getRequiredElement('image-list'),
+        emptyFilter: getRequiredElement('empty-filter'),
+        search: getRequiredElement('search'),
+        testResultFilter: getRequiredElement('test-result-filter'),
+        pageSize: getRequiredElement('page-size'),
         paginationControls: [
             {
-                container: document.getElementById('top-pagination'),
-                first: document.getElementById('top-first-page'),
-                previous: document.getElementById('top-previous-page'),
-                next: document.getElementById('top-next-page'),
-                last: document.getElementById('top-last-page'),
-                info: document.getElementById('top-page-info')
+                container: getRequiredElement('top-pagination'),
+                first: getRequiredElement('top-first-page'),
+                previous: getRequiredElement('top-previous-page'),
+                next: getRequiredElement('top-next-page'),
+                last: getRequiredElement('top-last-page'),
+                info: getRequiredElement('top-page-info')
             },
             {
-                container: document.getElementById('bottom-pagination'),
-                first: document.getElementById('first-page'),
-                previous: document.getElementById('previous-page'),
-                next: document.getElementById('next-page'),
-                last: document.getElementById('last-page'),
-                info: document.getElementById('page-info')
+                container: getRequiredElement('bottom-pagination'),
+                first: getRequiredElement('first-page'),
+                previous: getRequiredElement('previous-page'),
+                next: getRequiredElement('next-page'),
+                last: getRequiredElement('last-page'),
+                info: getRequiredElement('page-info')
             }
         ],
-        exportCsv: document.getElementById('export-csv'),
-        visibleCount: document.getElementById('visible-count'),
-        testScope: document.getElementById('test-scope'),
-        startDisplayTest: document.getElementById('start-display-test'),
-        stopDisplayTest: document.getElementById('stop-display-test'),
-        testProgress: document.getElementById('test-progress'),
-        testProgressBar: document.getElementById('test-progress-bar'),
-        testProgressText: document.getElementById('test-progress-text'),
+        exportCsv: getRequiredElement('export-csv'),
+        visibleCount: getRequiredElement('visible-count'),
+        testScope: getRequiredElement('test-scope'),
+        startDisplayTest: getRequiredElement('start-display-test'),
+        stopDisplayTest: getRequiredElement('stop-display-test'),
+        testProgress: getRequiredElement('test-progress'),
+        testProgressBar: getRequiredElement('test-progress-bar'),
+        testProgressText: getRequiredElement('test-progress-text'),
         testCounts: Object.fromEntries(
-            ['untested', ...Object.keys(DISPLAY_RESULT)].map(key => [key, document.getElementById(`test-count-${key}`)])
+            ['untested', ...Object.keys(DISPLAY_RESULT)].map(key => [key, getRequiredElement(`test-count-${key}`)])
         ),
         testFilterButtons: Array.from(document.querySelectorAll('[data-test-filter]'))
     };
