@@ -1,11 +1,35 @@
 (function () {
     'use strict';
 
+    /**
+     * @typedef {Object} CosenseExport
+     * @property {string} name URLに使われるプロジェクト名
+     * @property {string} [displayName] 画面表示用のプロジェクト名
+     * @property {Array<{title: string, lines: Array<string|{text: string}>}>} pages
+     */
+
+    /**
+     * @typedef {Object} GyazoImage
+     * @property {string} id 32桁のGyazo画像ID
+     * @property {string} url 確認用のGyazoページURL
+     * @property {Array<{pageTitle: string, lineText: string, lineNumber: number, pageUrl: string}>} sources
+     */
+
+    /**
+     * @typedef {Object} DisplayTestResult
+     * @property {'available'|'unavailable'|'timeout'} result
+     * @property {string} testedAt ISO 8601形式の検査日時
+     * @property {'png'|'jpg'|'gif'|'mp4'} [format] 表示できた形式
+     */
+
+    // 表示テストはHTTPステータスではなく、ブラウザのメディア読込イベントで判定する。
     const DISPLAY_RESULT = Object.freeze({ available: '表示できた', unavailable: '表示できない', timeout: '時間切れ' });
     const TEST_STORAGE_PREFIX = 'cosense-gyazo-review:display-tests:v1:';
     const TEST_TIMEOUT_MS = 12000;
     const TEST_CONCURRENCY = 3;
     const GYAZO_PATTERN = /https?:\/\/(?:i\.)?gyazo\.com\/([a-f0-9]{32})(?![a-f0-9])(?:\.[a-z0-9]+)?(?:[?#][^\s\]\[<>"']*)?/gi;
+
+    // DOM参照を一か所に集約し、描画処理で同じ要素を再検索しない。
     const elements = {
         fileInput: document.getElementById('file-input'), dropZone: document.getElementById('drop-zone'),
         inputExpanded: document.getElementById('input-expanded'), inputCompact: document.getElementById('input-compact'),
@@ -30,8 +54,10 @@
     let currentProject = null;
     let images = [];
     let displayTestResults = {};
+    // プレビューURLは現在のセッションだけで使い、localStorageには保存しない。
     let displayPreviewUrls = {};
     let currentPage = 1;
+    // JSON切り替え時に加算し、古い非同期リクエストの結果を破棄する。
     let sessionVersion = 0;
     let requestSequence = 0;
     let batchSequence = 0;
@@ -51,6 +77,12 @@
         elements.inputExpanded.classList.toggle('d-none', compact);
         elements.inputCompact.classList.toggle('d-none', !compact);
     }
+
+    /**
+     * Cosenseエクスポートとして処理できる最小限の構造か検証する。
+     * @param {unknown} data JSONから復元した値
+     * @throws {Error} 必須項目が不足している場合
+     */
     function validateExport(data) {
         if (!data || typeof data !== 'object' || Array.isArray(data)) throw new Error('JSONの最上位がオブジェクトではありません。Cosenseのプロジェクトエクスポートを選択してください。');
         if (typeof data.name !== 'string' || data.name.trim() === '') throw new Error('プロジェクト名（name）が見つかりません。Cosenseの通常のエクスポート形式か確認してください。');
@@ -59,9 +91,23 @@
         const invalidLine = data.pages.some(page => page.lines.some(line => typeof line !== 'string' && (!line || typeof line.text !== 'string')));
         if (invalidLine) throw new Error('文字列またはtextを持つオブジェクトではない行があります。エクスポート形式を確認してください。');
     }
+
+    /**
+     * プロジェクト名とページ名からCosenseの掲載元URLを生成する。
+     * @param {string} projectName
+     * @param {string} pageTitle
+     * @returns {string}
+     */
     function getCosensePageUrl(projectName, pageTitle) {
         return `https://scrapbox.io/${encodeURIComponent(projectName)}/${encodeURIComponent(pageTitle)}`;
     }
+
+    /**
+     * 全ページの行からGyazo画像IDを抽出し、画像ID単位で掲載元を集約する。
+     * 同じ行に同一IDが複数回あっても、掲載元は1件として扱う。
+     * @param {CosenseExport} data
+     * @returns {GyazoImage[]}
+     */
     function extractImages(data) {
         const imageMap = new Map();
         data.pages.forEach(page => page.lines.forEach((line, lineIndex) => {
@@ -79,7 +125,19 @@
         }));
         return Array.from(imageMap.values()).sort((a, b) => a.id.localeCompare(b.id));
     }
+
+    /**
+     * @param {string} projectName
+     * @returns {string}
+     */
     function getTestStorageKey(projectName) { return `${TEST_STORAGE_PREFIX}${encodeURIComponent(projectName)}`; }
+
+    /**
+     * 現在のJSONに含まれる画像だけを対象に、保存済みの表示テスト結果を復元する。
+     * @param {string} projectName
+     * @param {Set<string>} validImageIds
+     * @returns {Record<string, DisplayTestResult>}
+     */
     function loadDisplayTestResults(projectName, validImageIds) {
         try {
             const stored = JSON.parse(localStorage.getItem(getTestStorageKey(projectName)) || '{}');
@@ -93,6 +151,11 @@
             return {};
         }
     }
+
+    /**
+     * 表示テスト結果だけを保存し、ページ名や行本文、画像データは保存しない。
+     * @returns {void}
+     */
     function saveDisplayTestResults() {
         const minimal = {};
         images.forEach(image => {
@@ -105,6 +168,15 @@
         try { localStorage.setItem(getTestStorageKey(currentProject), JSON.stringify(minimal)); }
         catch (error) { showMessage('表示テスト結果をブラウザに保存できませんでした。ブラウザの保存設定を確認してください。', 'warning'); }
     }
+
+    /**
+     * 表示テスト用のi.gyazo.com URLを生成する。
+     * 再テスト時はキャッシュ回避用クエリを付けるが、画像ID自体は変更しない。
+     * @param {string} id
+     * @param {'png'|'jpg'|'gif'|'mp4'} format
+     * @param {boolean} cacheBust
+     * @returns {string}
+     */
     function getDisplayImageUrl(id, format, cacheBust) {
         const base = `https://i.gyazo.com/${id}.${format}`;
         return cacheBust ? `${base}?cosense_gyazo_review=${Date.now()}-${requestSequence}` : base;
@@ -113,6 +185,12 @@
         const date = new Date(value);
         return Number.isNaN(date.getTime()) ? value : date.toLocaleString('ja-JP');
     }
+
+    /**
+     * 掲載元ページと該当行を、安全なDOM操作だけで組み立てる。
+     * @param {{pageTitle: string, lineText: string, lineNumber: number, pageUrl: string}} source
+     * @returns {HTMLLIElement}
+     */
     function createSourceElement(source) {
         const item = document.createElement('li');
         item.className = 'source-item';
@@ -123,6 +201,12 @@
         item.append(link, line);
         return item;
     }
+
+    /**
+     * 画像1件分の表示テスト結果、プレビュー、操作ボタンを生成する。
+     * @param {GyazoImage} image
+     * @returns {HTMLDivElement}
+     */
     function createDisplayTestElement(image) {
         const container = document.createElement('div');
         const result = displayTestResults[image.id];
@@ -166,6 +250,12 @@
         container.append(resultBox, button);
         return container;
     }
+
+    /**
+     * 掲載元と表示テスト操作を含む、一覧の画像1件分を生成する。
+     * @param {GyazoImage} image
+     * @returns {HTMLElement}
+     */
     function createImageElement(image) {
         const article = document.createElement('article'); article.className = 'image-item'; article.dataset.imageId = image.id;
         const details = document.createElement('div');
@@ -178,6 +268,11 @@
         article.append(details, actions);
         return article;
     }
+
+    /**
+     * 検索語と表示テスト結果の条件に一致する画像を返す。
+     * @returns {GyazoImage[]}
+     */
     function getFilteredImages() {
         const query = elements.search.value.trim().toLocaleLowerCase('ja');
         const testResult = elements.testResultFilter.value;
@@ -188,6 +283,12 @@
             return [image.id, ...image.sources.flatMap(source => [source.pageTitle, source.lineText])].join('\n').toLocaleLowerCase('ja').includes(query);
         });
     }
+
+    /**
+     * 現在のページに表示する画像を返す。
+     * @param {GyazoImage[]} [filteredImages] 計算済みの絞り込み結果
+     * @returns {GyazoImage[]}
+     */
     function getVisibleImages(filteredImages) {
         const filtered = filteredImages || getFilteredImages();
         const pageSize = elements.pageSize.value === 'all' ? Math.max(filtered.length, 1) : Number(elements.pageSize.value);
@@ -196,6 +297,11 @@
         const start = (page - 1) * pageSize;
         return filtered.slice(start, start + pageSize);
     }
+
+    /**
+     * 一括テストの選択範囲に応じた対象画像を返す。
+     * @returns {GyazoImage[]}
+     */
     function getBatchTargets() {
         if (elements.testScope.value === 'all') return images.slice();
         const filtered = getFilteredImages();
@@ -207,6 +313,8 @@
         elements.startDisplayTest.textContent = `対象${count}件を順次テスト`;
         elements.startDisplayTest.disabled = count === 0;
     }
+
+    /** 一覧、件数表示、ページャー、絞り込み状態をまとめて再描画する。 */
     function renderList() {
         const filtered = getFilteredImages();
         const pageSize = elements.pageSize.value === 'all' ? Math.max(filtered.length, 1) : Number(elements.pageSize.value);
@@ -246,6 +354,14 @@
         if (elements.testResultFilter.value !== 'all' || getVisibleImages().some(image => image.id === imageId)) renderList();
         else updateTestScopeButton();
     }
+
+    /**
+     * PNG・JPG・GIF・MP4を並行して読み込み、最初に表示できた形式を採用する。
+     * セッション番号を照合し、JSON切り替え前の結果が新しい一覧へ混入するのを防ぐ。
+     * @param {GyazoImage} image
+     * @param {number|null} runId 一括テストの識別子。個別テストの場合はnull
+     * @returns {Promise<'available'|'unavailable'|'timeout'|'cancelled'>}
+     */
     function performDisplayTest(image, runId) {
         const previous = activeTestRequests.get(image.id);
         if (previous) previous.cancel();
@@ -334,6 +450,8 @@
         elements.stopDisplayTest.classList.toggle('d-none', !isRunning);
         if (!isRunning) updateTestScopeButton();
     }
+
+    /** 同時実行数を制限したワーカーで、選択範囲を順番に表示テストする。 */
     async function startBatchDisplayTest() {
         if (batchRun) return;
         const targets = getBatchTargets();
@@ -382,6 +500,11 @@
         renderList();
         elements.testProgressText.textContent = `停止しました: ${run.completed} / ${run.total}件を完了`;
     }
+
+    /**
+     * 実行中のテストを無効化し、過去の非同期結果が現在の画面へ反映されないようにする。
+     * JSONの切り替え前に必ず呼び出す。
+     */
     function invalidateDisplayTests() {
         sessionVersion += 1;
         if (batchRun) batchRun.stopped = true;
@@ -392,6 +515,11 @@
         elements.testProgress.classList.add('d-none');
         setBatchControls(false);
     }
+
+    /**
+     * 検証済みエクスポートを画面状態へ反映する。
+     * @param {CosenseExport} data
+     */
     function loadExport(data) {
         validateExport(data);
         const extracted = extractImages(data);
@@ -403,6 +531,12 @@
         elements.inputSummary.textContent = `${images.length}件のGyazo画像を読み込み済み`;
         updateDisplayTestSummary(); renderList(); showMessage(`${images.length}件のGyazo画像を読み込みました。`, 'success'); setInputCompact(true);
     }
+
+    /**
+     * 選択されたJSONファイルをブラウザ内で読み込み、解析する。
+     * @param {File|undefined} file
+     * @returns {Promise<void>}
+     */
     async function handleFile(file) {
         clearMessage(); elements.workspace.classList.add('d-none'); if (!file) return;
         setInputCompact(false);
@@ -415,7 +549,14 @@
         } catch (error) { showMessage(error instanceof Error ? error.message : 'ファイルの読み込みに失敗しました。', 'danger'); }
         finally { elements.fileInput.value = ''; }
     }
+
+    /**
+     * @param {unknown} value
+     * @returns {string}
+     */
     function csvEscape(value) { return `"${String(value).replace(/"/g, '""')}"`; }
+
+    /** 表示テスト結果をExcelで開きやすいBOM付きUTF-8のCSVとして保存する。 */
     function exportCsv() {
         const rows = images.map(image => {
             const testResult = displayTestResults[image.id];
