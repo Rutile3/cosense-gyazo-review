@@ -266,14 +266,12 @@
     }
 
     /**
-     * 画像1件分の表示テスト結果、プレビュー、操作ボタンを生成する。
-     * @param {GyazoImage} image
+     * 判定名と検査日時を表示する要素を生成する。
+     * @param {DisplayTestResult|undefined} result
+     * @param {boolean} isTesting
      * @returns {HTMLDivElement}
      */
-    function createDisplayTestElement(image) {
-        const container = document.createElement('div');
-        const result = state.displayTestResults[image.id];
-        const isTesting = state.testingImageIds.has(image.id);
+    function createDisplayTestResultElement(result, isTesting) {
         const resultBox = document.createElement('div');
         resultBox.className = 'display-test-result small';
         resultBox.dataset.result = isTesting ? 'testing' : (result ? result.result : 'untested');
@@ -287,30 +285,64 @@
             testedAt.textContent = `検査時点: ${formatTestedAt(result.testedAt)}`;
             resultBox.append(testedAt);
         }
-        if (result && result.result === 'available') {
-            const preview = document.createElement(result.format === 'mp4' ? 'video' : 'img');
-            preview.className = 'image-preview';
-            preview.src = state.displayPreviewUrls[image.id] || getDisplayImageUrl(image.id, result.format || 'png', null);
-            if (result.format === 'mp4') {
-                preview.controls = true;
-                preview.muted = true;
-                preview.preload = 'metadata';
-                preview.setAttribute('aria-label', `${image.id} の表示テスト時点の動画プレビュー`);
-            } else {
-                preview.alt = `${image.id} の表示テスト時点のプレビュー`;
-                preview.loading = 'lazy';
-                preview.decoding = 'async';
-            }
-            preview.addEventListener('error', () => preview.remove());
-            resultBox.append(preview);
+        return resultBox;
+    }
+
+    /**
+     * 表示できた画像または動画のプレビューを生成する。
+     * @param {GyazoImage} image
+     * @param {DisplayTestResult|undefined} result
+     * @returns {HTMLImageElement|HTMLVideoElement|null}
+     */
+    function createDisplayTestPreview(image, result) {
+        if (!result || result.result !== 'available') return null;
+        const preview = document.createElement(result.format === 'mp4' ? 'video' : 'img');
+        preview.className = 'image-preview';
+        preview.src = state.displayPreviewUrls[image.id] || getDisplayImageUrl(image.id, result.format || 'png', null);
+        if (result.format === 'mp4') {
+            preview.controls = true;
+            preview.muted = true;
+            preview.preload = 'metadata';
+            preview.setAttribute('aria-label', `${image.id} の表示テスト時点の動画プレビュー`);
+        } else {
+            preview.alt = `${image.id} の表示テスト時点のプレビュー`;
+            preview.loading = 'lazy';
+            preview.decoding = 'async';
         }
+        preview.addEventListener('error', () => preview.remove());
+        return preview;
+    }
+
+    /**
+     * 画像1件の表示テストまたは再テストを開始するボタンを生成する。
+     * @param {GyazoImage} image
+     * @param {DisplayTestResult|undefined} result
+     * @param {boolean} isTesting
+     * @returns {HTMLButtonElement}
+     */
+    function createDisplayTestButton(image, result, isTesting) {
         const button = document.createElement('button');
         button.type = 'button';
         button.className = 'btn btn-outline-secondary mt-2';
         button.disabled = isTesting || Boolean(state.batchRun);
         button.textContent = isTesting ? 'テスト中…' : (state.batchRun ? '一括テスト中' : (result ? '再テスト' : '表示をテスト'));
         button.addEventListener('click', () => runSingleDisplayTest(image));
-        container.append(resultBox, button);
+        return button;
+    }
+
+    /**
+     * 画像1件分の表示テスト結果、プレビュー、操作ボタンを組み立てる。
+     * @param {GyazoImage} image
+     * @returns {HTMLDivElement}
+     */
+    function createDisplayTestElement(image) {
+        const container = document.createElement('div');
+        const result = state.displayTestResults[image.id];
+        const isTesting = state.testingImageIds.has(image.id);
+        const resultBox = createDisplayTestResultElement(result, isTesting);
+        const preview = createDisplayTestPreview(image, result);
+        if (preview) resultBox.append(preview);
+        container.append(resultBox, createDisplayTestButton(image, result, isTesting));
         return container;
     }
 
