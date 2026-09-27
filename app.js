@@ -719,23 +719,8 @@
         const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
         const link = document.createElement('a'); link.href = url; link.download = `gyazo-review-${state.currentProject.replace(/[\\/:*?"<>|]/g, '_')}.csv`; document.body.append(link); link.click(); link.remove(); URL.revokeObjectURL(url);
     }
-    elements.fileInput.addEventListener('change', event => handleFile(event.target.files[0]));
-    elements.chooseAnotherFile.addEventListener('click', () => elements.fileInput.click());
-    elements.dropZone.addEventListener('keydown', event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); elements.fileInput.click(); } });
-    ['dragenter', 'dragover'].forEach(type => elements.dropZone.addEventListener(type, event => { event.preventDefault(); elements.dropZone.classList.add('is-dragging'); }));
-    ['dragleave', 'drop'].forEach(type => elements.dropZone.addEventListener(type, event => { event.preventDefault(); elements.dropZone.classList.remove('is-dragging'); }));
-    elements.dropZone.addEventListener('drop', event => handleFile(event.dataTransfer.files[0]));
+
     function resetPageAndRender() { state.currentPage = 1; renderList(); }
-    elements.search.addEventListener('input', resetPageAndRender);
-    elements.testResultFilter.addEventListener('change', resetPageAndRender);
-    elements.testFilterButtons.forEach(button => button.addEventListener('click', () => {
-        elements.testResultFilter.value = elements.testResultFilter.value === button.dataset.testFilter ? 'all' : button.dataset.testFilter;
-        resetPageAndRender();
-    }));
-    elements.pageSize.addEventListener('change', resetPageAndRender);
-    elements.testScope.addEventListener('change', updateTestScopeButton);
-    elements.startDisplayTest.addEventListener('click', startBatchDisplayTest);
-    elements.stopDisplayTest.addEventListener('click', stopBatchDisplayTest);
     function moveToFirstPage() { state.currentPage = 1; renderList(); }
     function moveToPreviousPage() { if (state.currentPage > 1) { state.currentPage -= 1; renderList(); } }
     function moveToNextPage() { state.currentPage += 1; renderList(); }
@@ -743,12 +728,34 @@
         state.currentPage = getCurrentListView().totalPages;
         renderList();
     }
-    elements.paginationControls.forEach(controls => {
-        controls.first.addEventListener('click', moveToFirstPage);
-        controls.previous.addEventListener('click', moveToPreviousPage);
-        controls.next.addEventListener('click', moveToNextPage);
-        controls.last.addEventListener('click', moveToLastPage);
-    });
-    elements.exportCsv.addEventListener('click', exportCsv);
+
+    /** 画面上の操作要素へイベントを登録する。初期化時に1回だけ呼び出す。 */
+    function bindEvents() {
+        elements.fileInput.addEventListener('change', event => handleFile(event.target.files[0]));
+        elements.chooseAnotherFile.addEventListener('click', () => elements.fileInput.click());
+        elements.dropZone.addEventListener('keydown', event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); elements.fileInput.click(); } });
+        ['dragenter', 'dragover'].forEach(type => elements.dropZone.addEventListener(type, event => { event.preventDefault(); elements.dropZone.classList.add('is-dragging'); }));
+        ['dragleave', 'drop'].forEach(type => elements.dropZone.addEventListener(type, event => { event.preventDefault(); elements.dropZone.classList.remove('is-dragging'); }));
+        elements.dropZone.addEventListener('drop', event => handleFile(event.dataTransfer.files[0]));
+        elements.search.addEventListener('input', resetPageAndRender);
+        elements.testResultFilter.addEventListener('change', resetPageAndRender);
+        elements.testFilterButtons.forEach(button => button.addEventListener('click', () => {
+            elements.testResultFilter.value = elements.testResultFilter.value === button.dataset.testFilter ? 'all' : button.dataset.testFilter;
+            resetPageAndRender();
+        }));
+        elements.pageSize.addEventListener('change', resetPageAndRender);
+        elements.testScope.addEventListener('change', updateTestScopeButton);
+        elements.startDisplayTest.addEventListener('click', startBatchDisplayTest);
+        elements.stopDisplayTest.addEventListener('click', stopBatchDisplayTest);
+        elements.paginationControls.forEach(controls => {
+            controls.first.addEventListener('click', moveToFirstPage);
+            controls.previous.addEventListener('click', moveToPreviousPage);
+            controls.next.addEventListener('click', moveToNextPage);
+            controls.last.addEventListener('click', moveToLastPage);
+        });
+        elements.exportCsv.addEventListener('click', exportCsv);
+    }
+
     window.CosenseGyazoReview = Object.freeze({ extractImages, validateExport, getCosensePageUrl, filterImages, paginateImages, csvEscape });
+    bindEvents();
 }());
