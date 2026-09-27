@@ -83,6 +83,7 @@
     const TEST_STORAGE_PREFIX = 'cosense-gyazo-review:display-tests:v1:';
     const TEST_TIMEOUT_MS = 12000;
     const TEST_CONCURRENCY = 3;
+    const CSV_HEADER = Object.freeze(['画像ID', '確認用URL', '表示テスト結果', '検査日時', '掲載元ページ']);
     const GYAZO_PATTERN = /https?:\/\/(?:i\.)?gyazo\.com\/([a-f0-9]{32})(?![a-f0-9])(?:\.[a-z0-9]+)?(?:[?#][^\s\]\[<>"']*)?/gi;
 
     // DOM参照を一か所に集約し、描画処理で同じ要素を再検索しない。
@@ -795,10 +796,15 @@
         return `"${String(value).replace(/"/g, '""')}"`;
     }
 
-    /** 表示テスト結果をExcelで開きやすいBOM付きUTF-8のCSVとして保存する。 */
-    function exportCsv() {
-        const rows = state.images.map(image => {
-            const testResult = state.displayTestResults[image.id];
+    /**
+     * 画像一覧と表示テスト結果からCSVのデータ行を生成する。
+     * @param {GyazoImage[]} imageItems
+     * @param {Record<string, DisplayTestResult>} testResults
+     * @returns {string[][]}
+     */
+    function createCsvRows(imageItems, testResults) {
+        return imageItems.map(image => {
+            const testResult = testResults[image.id];
             return [
                 image.id,
                 image.url,
@@ -807,18 +813,42 @@
                 Array.from(new Set(image.sources.map(source => source.pageTitle))).join(' / ')
             ];
         });
-        const csv = '\uFEFF' + [
-            ['画像ID', '確認用URL', '表示テスト結果', '検査日時', '掲載元ページ'],
+    }
+
+    /**
+     * CSVのデータ行を、Excelで開きやすいBOM付きUTF-8の文字列へ変換する。
+     * @param {string[][]} rows
+     * @returns {string}
+     */
+    function createCsvText(rows) {
+        return '\uFEFF' + [
+            CSV_HEADER,
             ...rows
         ].map(row => row.map(csvEscape).join(',')).join('\r\n');
-        const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+    }
+
+    /**
+     * CSV文字列をBlobへ変換し、指定したファイル名でダウンロードする。
+     * @param {string} csvText
+     * @param {string} fileName
+     */
+    function downloadCsv(csvText, fileName) {
+        const url = URL.createObjectURL(new Blob([csvText], { type: 'text/csv;charset=utf-8' }));
         const link = document.createElement('a');
         link.href = url;
-        link.download = `gyazo-review-${state.currentProject.replace(/[\\/:*?"<>|]/g, '_')}.csv`;
+        link.download = fileName;
         document.body.append(link);
         link.click();
         link.remove();
         URL.revokeObjectURL(url);
+    }
+
+    /** 表示テスト結果のCSV生成とダウンロードを調整する。 */
+    function exportCsv() {
+        const rows = createCsvRows(state.images, state.displayTestResults);
+        const csvText = createCsvText(rows);
+        const fileName = `gyazo-review-${state.currentProject.replace(/[\\/:*?"<>|]/g, '_')}.csv`;
+        downloadCsv(csvText, fileName);
     }
 
     function resetPageAndRender() {
@@ -888,7 +918,9 @@
         getCosensePageUrl,
         filterImages,
         paginateImages,
-        csvEscape
+        csvEscape,
+        createCsvRows,
+        createCsvText
     });
     bindEvents();
 }());
