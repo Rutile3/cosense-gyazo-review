@@ -97,6 +97,9 @@
 
     const TEST_STORAGE_PREFIX = 'cosense-gyazo-review:display-tests:v1:';
     const TEST_CONCURRENCY = 3;
+    const SEARCH_DEBOUNCE_MS = 1000;
+    /** @type {number|null} */
+    let searchRenderTimer = null;
     /**
      * 必須のDOM要素をIDで取得し、HTMLとの不整合を初期化時に検出する。
      * @param {string} id
@@ -691,6 +694,7 @@
      * @returns {Promise<void>}
      */
     async function handleFile(file) {
+        cancelPendingSearchRender();
         clearMessage();
         elements.workspace.classList.add('d-none');
         if (!file) return;
@@ -743,7 +747,24 @@
         downloadCsv(csvText, fileName);
     }
 
+    /** 保留中の検索結果更新を取り消す。 */
+    function cancelPendingSearchRender() {
+        if (searchRenderTimer === null) return;
+        clearTimeout(searchRenderTimer);
+        searchRenderTimer = null;
+    }
+
+    /** 検索入力が落ち着いてから一覧を更新する。 */
+    function scheduleSearchRender() {
+        cancelPendingSearchRender();
+        searchRenderTimer = setTimeout(() => {
+            searchRenderTimer = null;
+            resetPageAndRender();
+        }, SEARCH_DEBOUNCE_MS);
+    }
+
     function resetPageAndRender() {
+        cancelPendingSearchRender();
         setCurrentPage(1);
         renderList();
     }
@@ -785,7 +806,7 @@
             elements.dropZone.classList.remove('is-dragging');
         }));
         elements.dropZone.addEventListener('drop', event => handleFile(event.dataTransfer.files[0]));
-        elements.search.addEventListener('input', resetPageAndRender);
+        elements.search.addEventListener('input', scheduleSearchRender);
         elements.testResultFilter.addEventListener('change', resetPageAndRender);
         elements.testFilterButtons.forEach(button => button.addEventListener('click', () => {
             elements.testResultFilter.value = elements.testResultFilter.value === button.dataset.testFilter ? 'all' : button.dataset.testFilter;
