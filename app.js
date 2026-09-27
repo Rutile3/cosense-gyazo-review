@@ -9,13 +9,16 @@
         message: document.getElementById('message'), workspace: document.getElementById('workspace'),
         projectHeading: document.getElementById('project-heading'), imageList: document.getElementById('image-list'),
         emptyFilter: document.getElementById('empty-filter'), search: document.getElementById('search'),
-        statusFilter: document.getElementById('status-filter'), openNext: document.getElementById('open-next'),
+        statusFilter: document.getElementById('status-filter'), pageSize: document.getElementById('page-size'),
+        pagination: document.getElementById('pagination'), previousPage: document.getElementById('previous-page'),
+        nextPage: document.getElementById('next-page'), pageInfo: document.getElementById('page-info'), openNext: document.getElementById('open-next'),
         exportCsv: document.getElementById('export-csv'), visibleCount: document.getElementById('visible-count'),
         counts: Object.fromEntries(['total', ...Object.keys(STATUS)].map(key => [key, document.getElementById(`count-${key}`)]))
     };
     let currentProject = null;
     let images = [];
     let progress = {};
+    let currentPage = 1;
 
     function showMessage(text, type) {
         elements.message.textContent = text;
@@ -107,8 +110,19 @@
     }
     function renderList() {
         const filtered = getFilteredImages();
-        const fragment = document.createDocumentFragment(); filtered.forEach(image => fragment.append(createImageElement(image)));
-        elements.imageList.replaceChildren(fragment); elements.emptyFilter.classList.toggle('d-none', filtered.length !== 0); elements.visibleCount.textContent = `${filtered.length} / ${images.length}件を表示`;
+        const pageSize = elements.pageSize.value === 'all' ? Math.max(filtered.length, 1) : Number(elements.pageSize.value);
+        const totalPages = Math.max(Math.ceil(filtered.length / pageSize), 1);
+        currentPage = Math.min(currentPage, totalPages);
+        const start = (currentPage - 1) * pageSize;
+        const visible = filtered.slice(start, start + pageSize);
+        const fragment = document.createDocumentFragment(); visible.forEach(image => fragment.append(createImageElement(image)));
+        elements.imageList.replaceChildren(fragment);
+        elements.emptyFilter.classList.toggle('d-none', filtered.length !== 0);
+        elements.visibleCount.textContent = filtered.length === 0 ? `0 / ${images.length}件` : `${start + 1}〜${start + visible.length} / ${filtered.length}件`;
+        elements.pagination.classList.toggle('d-none', filtered.length === 0 || elements.pageSize.value === 'all');
+        elements.pageInfo.textContent = `${currentPage} / ${totalPages}ページ`;
+        elements.previousPage.disabled = currentPage === 1;
+        elements.nextPage.disabled = currentPage === totalPages;
     }
     function updateSummary() {
         const counts = { total: images.length, unchecked: 0, completed: 0, pending: 0, excluded: 0 };
@@ -121,7 +135,7 @@
         const extracted = extractImages(data);
         if (extracted.length === 0) throw new Error('有効なGyazo画像URLが見つかりませんでした。32桁の画像IDを含むURLがあるか確認してください。');
         currentProject = data.name; images = extracted; progress = loadProgress(currentProject);
-        elements.projectHeading.textContent = data.displayName || data.name; elements.search.value = ''; elements.statusFilter.value = 'all'; elements.workspace.classList.remove('d-none');
+        currentPage = 1; elements.projectHeading.textContent = data.displayName || data.name; elements.search.value = ''; elements.statusFilter.value = 'all'; elements.workspace.classList.remove('d-none');
         updateSummary(); renderList(); showMessage(`${images.length}件のGyazo画像を読み込みました。`, 'success');
     }
     async function handleFile(file) {
@@ -146,7 +160,12 @@
     ['dragenter', 'dragover'].forEach(type => elements.dropZone.addEventListener(type, event => { event.preventDefault(); elements.dropZone.classList.add('is-dragging'); }));
     ['dragleave', 'drop'].forEach(type => elements.dropZone.addEventListener(type, event => { event.preventDefault(); elements.dropZone.classList.remove('is-dragging'); }));
     elements.dropZone.addEventListener('drop', event => handleFile(event.dataTransfer.files[0]));
-    elements.search.addEventListener('input', renderList); elements.statusFilter.addEventListener('change', renderList);
+    function resetPageAndRender() { currentPage = 1; renderList(); }
+    elements.search.addEventListener('input', resetPageAndRender);
+    elements.statusFilter.addEventListener('change', resetPageAndRender);
+    elements.pageSize.addEventListener('change', resetPageAndRender);
+    elements.previousPage.addEventListener('click', () => { if (currentPage > 1) { currentPage -= 1; renderList(); } });
+    elements.nextPage.addEventListener('click', () => { currentPage += 1; renderList(); });
     elements.openNext.addEventListener('click', () => { const next = images.find(image => getStatus(image.id) === 'unchecked'); if (next) window.open(next.url, '_blank', 'noopener,noreferrer'); });
     elements.exportCsv.addEventListener('click', exportCsv);
     window.CosenseGyazoReview = Object.freeze({ extractImages, validateExport, getCosensePageUrl, csvEscape });

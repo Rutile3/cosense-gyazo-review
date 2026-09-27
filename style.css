@@ -33,5 +33,6 @@ body { margin: 0; color: #20252b; background: #efefef; font-family: system-ui, -
 .status-select { border-left-width: 5px; }
 .status-select[data-status="unchecked"] { border-left-color: #65707c; } .status-select[data-status="completed"] { border-left-color: #198754; } .status-select[data-status="pending"] { border-left-color: #e6a100; } .status-select[data-status="excluded"] { border-left-color: #6f42c1; }
 .empty-state { padding: 3rem 1rem; color: var(--muted); text-align: center; }
+.pagination-bar { display: flex; align-items: center; justify-content: center; gap: 1rem; padding: 1rem; border-top: 1px solid var(--border); }
 @media (max-width: 767.98px) { .summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .summary-card:first-child { grid-column: 1 / -1; } .image-item { grid-template-columns: 1fr; } }
 @media (max-width: 420px) { .navbar-brand { max-width: 75%; font-size: 1rem; white-space: normal; } }
