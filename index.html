@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="color-scheme" content="light">
-    <meta name="description" content="CosenseエクスポートからGyazo画像を抽出し、配信再開作業の進捗を管理するローカルツール">
+    <meta name="description" content="CosenseエクスポートからGyazo画像を抽出し、ブラウザで表示可否を確認するローカルツール">
     <title>Cosense Gyazo 配信再開チェッカー</title>
     <link rel="icon" href="favicon.png" type="image/png">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
@@ -41,15 +41,12 @@
                 <div class="card-body">
                     <div class="d-flex flex-wrap align-items-start justify-content-between gap-3 mb-3">
                         <div><p class="text-secondary small mb-1">読み込み中のプロジェクト</p><h2 id="project-heading" class="h3 mb-0"></h2></div>
-                        <div class="d-flex flex-wrap gap-2"><button id="export-csv" type="button" class="btn btn-outline-secondary">作業状況をCSV出力</button></div>
+                        <div class="d-flex flex-wrap gap-2"><button id="export-csv" type="button" class="btn btn-outline-secondary">表示テスト結果をCSV出力</button></div>
                     </div>
                     <div class="notice mb-4" role="note">
-                        <strong>「完了」は自己申告の記録です。</strong><br>
-                        このツールはGyazoの配信状態を確認・変更しません。<br>
+                        <strong>表示テスト結果は、検査時点でファイルを読み込めたかどうかの記録です。</strong><br>
+                        配信状態や配信再開作業の完了を保証するものではありません。<br>
                         画像をGyazoで確認し、公開して問題ないものだけ、Gyazo上で手動で「配信を再開する」を押してください。
-                    </div>
-                    <div class="summary-grid" aria-label="作業件数">
-                        <div class="summary-card"><span>対象画像</span><strong id="count-total">0</strong></div><div class="summary-card status-unchecked"><span>未確認</span><strong id="count-unchecked">0</strong></div><div class="summary-card status-completed"><span>完了</span><strong id="count-completed">0</strong></div><div class="summary-card status-pending"><span>保留</span><strong id="count-pending">0</strong></div><div class="summary-card status-excluded"><span>対象外</span><strong id="count-excluded">0</strong></div>
                     </div>
                 </div>
             </div>
@@ -68,7 +65,7 @@
                             <label for="test-scope" class="form-label">一括テストの対象</label>
                             <select id="test-scope" class="form-select">
                                 <option value="page">現在のページ</option>
-                                <option value="filtered">検索・状況絞り込みに一致する全件</option>
+                                <option value="filtered">検索・表示テスト結果の絞り込みに一致する全件</option>
                                 <option value="all">抽出した全画像</option>
                             </select>
                         </div>
@@ -86,7 +83,7 @@
             <div class="card shadow-sm">
                 <div class="card-body border-bottom"><div class="row g-3 align-items-end">
                     <div class="col-md-5"><label for="search" class="form-label">検索</label><input id="search" type="search" class="form-control" placeholder="画像ID・ページ名・該当行を検索"></div>
-                    <div class="col-md-3"><label for="status-filter" class="form-label">状況</label><select id="status-filter" class="form-select"><option value="all">すべて</option><option value="unchecked">未確認</option><option value="completed">完了</option><option value="pending">保留</option><option value="excluded">対象外</option></select></div>
+                    <div class="col-md-3"><label for="test-result-filter" class="form-label">表示テスト結果</label><select id="test-result-filter" class="form-select"><option value="all">すべて</option><option value="untested">未判定</option><option value="available">表示できた</option><option value="unavailable">表示できない</option><option value="timeout">時間切れ</option></select></div>
                     <div class="col-md-2"><label for="page-size" class="form-label">表示件数</label><select id="page-size" class="form-select"><option value="10">10件</option><option value="20" selected>20件</option><option value="50">50件</option><option value="100">100件</option><option value="all">全件</option></select></div>
                     <div class="col-md-2 text-md-end"><span id="visible-count" class="small text-secondary"></span></div>
                 </div></div>

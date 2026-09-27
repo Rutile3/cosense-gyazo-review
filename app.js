@@ -1,9 +1,7 @@
 (function () {
     'use strict';
 
-    const STATUS = Object.freeze({ unchecked: '未確認', completed: '完了', pending: '保留', excluded: '対象外' });
     const DISPLAY_RESULT = Object.freeze({ available: '表示できた', unavailable: '表示できない', timeout: '時間切れ' });
-    const STORAGE_PREFIX = 'cosense-gyazo-review:v1:';
     const TEST_STORAGE_PREFIX = 'cosense-gyazo-review:display-tests:v1:';
     const TEST_TIMEOUT_MS = 12000;
     const TEST_CONCURRENCY = 3;
@@ -13,7 +11,7 @@
         message: document.getElementById('message'), workspace: document.getElementById('workspace'),
         projectHeading: document.getElementById('project-heading'), imageList: document.getElementById('image-list'),
         emptyFilter: document.getElementById('empty-filter'), search: document.getElementById('search'),
-        statusFilter: document.getElementById('status-filter'), pageSize: document.getElementById('page-size'),
+        testResultFilter: document.getElementById('test-result-filter'), pageSize: document.getElementById('page-size'),
         topPagination: document.getElementById('top-pagination'), topFirstPage: document.getElementById('top-first-page'),
         topPreviousPage: document.getElementById('top-previous-page'), topNextPage: document.getElementById('top-next-page'),
         topLastPage: document.getElementById('top-last-page'), topPageInfo: document.getElementById('top-page-info'),
@@ -24,12 +22,10 @@
         testScope: document.getElementById('test-scope'), startDisplayTest: document.getElementById('start-display-test'),
         stopDisplayTest: document.getElementById('stop-display-test'), testProgress: document.getElementById('test-progress'),
         testProgressBar: document.getElementById('test-progress-bar'), testProgressText: document.getElementById('test-progress-text'),
-        testCounts: Object.fromEntries(['untested', ...Object.keys(DISPLAY_RESULT)].map(key => [key, document.getElementById(`test-count-${key}`)])),
-        counts: Object.fromEntries(['total', ...Object.keys(STATUS)].map(key => [key, document.getElementById(`count-${key}`)]))
+        testCounts: Object.fromEntries(['untested', ...Object.keys(DISPLAY_RESULT)].map(key => [key, document.getElementById(`test-count-${key}`)]))
     };
     let currentProject = null;
     let images = [];
-    let progress = {};
     let displayTestResults = {};
     let displayPreviewUrls = {};
     let currentPage = 1;
@@ -76,24 +72,7 @@
         }));
         return Array.from(imageMap.values()).sort((a, b) => a.id.localeCompare(b.id));
     }
-    function getStorageKey(projectName) { return `${STORAGE_PREFIX}${encodeURIComponent(projectName)}`; }
     function getTestStorageKey(projectName) { return `${TEST_STORAGE_PREFIX}${encodeURIComponent(projectName)}`; }
-    function loadProgress(projectName) {
-        try {
-            const stored = JSON.parse(localStorage.getItem(getStorageKey(projectName)) || '{}');
-            if (!stored || typeof stored !== 'object' || Array.isArray(stored)) return {};
-            return Object.fromEntries(Object.entries(stored).filter(([id, status]) => /^[a-f0-9]{32}$/.test(id) && STATUS[status]));
-        } catch (error) {
-            showMessage('保存済みの進捗を読み込めなかったため、未確認の状態で表示します。', 'warning');
-            return {};
-        }
-    }
-    function saveProgress() {
-        const minimal = {};
-        images.forEach(image => { if (progress[image.id] && progress[image.id] !== 'unchecked') minimal[image.id] = progress[image.id]; });
-        try { localStorage.setItem(getStorageKey(currentProject), JSON.stringify(minimal)); }
-        catch (error) { showMessage('進捗をブラウザに保存できませんでした。ブラウザの保存設定を確認してください。', 'warning'); }
-    }
     function loadDisplayTestResults(projectName, validImageIds) {
         try {
             const stored = JSON.parse(localStorage.getItem(getTestStorageKey(projectName)) || '{}');
@@ -119,7 +98,6 @@
         try { localStorage.setItem(getTestStorageKey(currentProject), JSON.stringify(minimal)); }
         catch (error) { showMessage('表示テスト結果をブラウザに保存できませんでした。ブラウザの保存設定を確認してください。', 'warning'); }
     }
-    function getStatus(id) { return progress[id] || 'unchecked'; }
     function getDisplayImageUrl(id, format, cacheBust) {
         const base = `https://i.gyazo.com/${id}.${format}`;
         return cacheBust ? `${base}?cosense_gyazo_review=${Date.now()}-${requestSequence}` : base;
@@ -190,18 +168,15 @@
         const actions = document.createElement('div'); actions.className = 'item-actions';
         const open = document.createElement('a'); open.className = 'btn btn-outline-primary'; open.href = image.url; open.target = '_blank'; open.rel = 'noopener noreferrer'; open.textContent = 'Gyazoで開く'; actions.append(open);
         actions.append(createDisplayTestElement(image));
-        const label = document.createElement('label'); label.className = 'small fw-semibold'; label.textContent = '作業状況';
-        const select = document.createElement('select'); select.className = 'form-select status-select mt-1'; select.dataset.status = getStatus(image.id); select.setAttribute('aria-label', `${image.id} の作業状況`);
-        Object.entries(STATUS).forEach(([value, text]) => { const option = document.createElement('option'); option.value = value; option.textContent = text; option.selected = value === getStatus(image.id); select.append(option); });
-        select.addEventListener('change', () => { progress[image.id] = select.value; select.dataset.status = select.value; saveProgress(); updateSummary(); if (elements.statusFilter.value !== 'all') renderList(); });
-        label.append(select); actions.append(label); article.append(details, actions);
+        article.append(details, actions);
         return article;
     }
     function getFilteredImages() {
         const query = elements.search.value.trim().toLocaleLowerCase('ja');
-        const status = elements.statusFilter.value;
+        const testResult = elements.testResultFilter.value;
         return images.filter(image => {
-            if (status !== 'all' && getStatus(image.id) !== status) return false;
+            const imageResult = displayTestResults[image.id]?.result || 'untested';
+            if (testResult !== 'all' && imageResult !== testResult) return false;
             if (!query) return true;
             return [image.id, ...image.sources.flatMap(source => [source.pageTitle, source.lineText])].join('\n').toLocaleLowerCase('ja').includes(query);
         });
@@ -243,11 +218,6 @@
         [elements.topNextPage, elements.nextPage, elements.topLastPage, elements.lastPage].forEach(button => { button.disabled = currentPage === totalPages; });
         updateTestScopeButton();
     }
-    function updateSummary() {
-        const counts = { total: images.length, unchecked: 0, completed: 0, pending: 0, excluded: 0 };
-        images.forEach(image => { counts[getStatus(image.id)] += 1; });
-        Object.entries(counts).forEach(([key, value]) => { elements.counts[key].textContent = value; });
-    }
     function updateDisplayTestSummary() {
         const counts = { untested: 0, available: 0, unavailable: 0, timeout: 0 };
         images.forEach(image => {
@@ -258,7 +228,7 @@
     }
     function refreshDisplayTestUi(imageId) {
         updateDisplayTestSummary();
-        if (getVisibleImages().some(image => image.id === imageId)) renderList();
+        if (elements.testResultFilter.value !== 'all' || getVisibleImages().some(image => image.id === imageId)) renderList();
         else updateTestScopeButton();
     }
     function performDisplayTest(image, runId) {
@@ -410,11 +380,11 @@
         validateExport(data);
         const extracted = extractImages(data);
         if (extracted.length === 0) throw new Error('有効なGyazo画像URLが見つかりませんでした。32桁の画像IDを含むURLがあるか確認してください。');
-        currentProject = data.name; images = extracted; progress = loadProgress(currentProject);
+        currentProject = data.name; images = extracted;
         displayTestResults = loadDisplayTestResults(currentProject, new Set(images.map(image => image.id)));
         displayPreviewUrls = {};
-        currentPage = 1; elements.projectHeading.textContent = data.displayName || data.name; elements.search.value = ''; elements.statusFilter.value = 'all'; elements.workspace.classList.remove('d-none');
-        updateSummary(); updateDisplayTestSummary(); renderList(); showMessage(`${images.length}件のGyazo画像を読み込みました。`, 'success');
+        currentPage = 1; elements.projectHeading.textContent = data.displayName || data.name; elements.search.value = ''; elements.testResultFilter.value = 'all'; elements.workspace.classList.remove('d-none');
+        updateDisplayTestSummary(); renderList(); showMessage(`${images.length}件のGyazo画像を読み込みました。`, 'success');
     }
     async function handleFile(file) {
         clearMessage(); elements.workspace.classList.add('d-none'); if (!file) return;
@@ -431,9 +401,9 @@
     function exportCsv() {
         const rows = images.map(image => {
             const testResult = displayTestResults[image.id];
-            return [image.id, image.url, STATUS[getStatus(image.id)], testResult ? DISPLAY_RESULT[testResult.result] : '未判定', testResult ? testResult.testedAt : '', Array.from(new Set(image.sources.map(source => source.pageTitle))).join(' / ')];
+            return [image.id, image.url, testResult ? DISPLAY_RESULT[testResult.result] : '未判定', testResult ? testResult.testedAt : '', Array.from(new Set(image.sources.map(source => source.pageTitle))).join(' / ')];
         });
-        const csv = '\uFEFF' + [['画像ID', '確認用URL', '作業状況', '表示テスト結果', '検査日時', '掲載元ページ'], ...rows].map(row => row.map(csvEscape).join(',')).join('\r\n');
+        const csv = '\uFEFF' + [['画像ID', '確認用URL', '表示テスト結果', '検査日時', '掲載元ページ'], ...rows].map(row => row.map(csvEscape).join(',')).join('\r\n');
         const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
         const link = document.createElement('a'); link.href = url; link.download = `gyazo-review-${currentProject.replace(/[\\/:*?"<>|]/g, '_')}.csv`; document.body.append(link); link.click(); link.remove(); URL.revokeObjectURL(url);
     }
@@ -444,7 +414,7 @@
     elements.dropZone.addEventListener('drop', event => handleFile(event.dataTransfer.files[0]));
     function resetPageAndRender() { currentPage = 1; renderList(); }
     elements.search.addEventListener('input', resetPageAndRender);
-    elements.statusFilter.addEventListener('change', resetPageAndRender);
+    elements.testResultFilter.addEventListener('change', resetPageAndRender);
     elements.pageSize.addEventListener('change', resetPageAndRender);
     elements.testScope.addEventListener('change', updateTestScopeButton);
     elements.startDisplayTest.addEventListener('click', startBatchDisplayTest);
