@@ -61,10 +61,10 @@
                         </ul>
                     </details>
                     <div class="test-summary-grid mb-3" aria-label="表示テスト件数">
-                        <div><span>未判定</span><strong id="test-count-untested">0</strong></div>
-                        <div><span>表示できた</span><strong id="test-count-available">0</strong></div>
-                        <div><span>表示できない</span><strong id="test-count-unavailable">0</strong></div>
-                        <div><span>時間切れ</span><strong id="test-count-timeout">0</strong></div>
+                        <button type="button" class="test-summary-card" data-test-filter="untested" aria-pressed="false"><span>未判定</span><strong id="test-count-untested">0</strong></button>
+                        <button type="button" class="test-summary-card" data-test-filter="available" aria-pressed="false"><span>表示できた</span><strong id="test-count-available">0</strong></button>
+                        <button type="button" class="test-summary-card" data-test-filter="unavailable" aria-pressed="false"><span>表示できない</span><strong id="test-count-unavailable">0</strong></button>
+                        <button type="button" class="test-summary-card" data-test-filter="timeout" aria-pressed="false"><span>時間切れ</span><strong id="test-count-timeout">0</strong></button>
                     </div>
                     <div class="row g-3 align-items-end">
                         <div class="col-md-5">

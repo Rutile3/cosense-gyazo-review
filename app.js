@@ -24,7 +24,8 @@
         testScope: document.getElementById('test-scope'), startDisplayTest: document.getElementById('start-display-test'),
         stopDisplayTest: document.getElementById('stop-display-test'), testProgress: document.getElementById('test-progress'),
         testProgressBar: document.getElementById('test-progress-bar'), testProgressText: document.getElementById('test-progress-text'),
-        testCounts: Object.fromEntries(['untested', ...Object.keys(DISPLAY_RESULT)].map(key => [key, document.getElementById(`test-count-${key}`)]))
+        testCounts: Object.fromEntries(['untested', ...Object.keys(DISPLAY_RESULT)].map(key => [key, document.getElementById(`test-count-${key}`)])),
+        testFilterButtons: Array.from(document.querySelectorAll('[data-test-filter]'))
     };
     let currentProject = null;
     let images = [];
@@ -222,6 +223,7 @@
         [elements.topPageInfo, elements.pageInfo].forEach(info => { info.textContent = `${currentPage} / ${totalPages}ページ`; });
         [elements.topFirstPage, elements.firstPage, elements.topPreviousPage, elements.previousPage].forEach(button => { button.disabled = currentPage === 1; });
         [elements.topNextPage, elements.nextPage, elements.topLastPage, elements.lastPage].forEach(button => { button.disabled = currentPage === totalPages; });
+        updateTestFilterButtons();
         updateTestScopeButton();
     }
     function updateDisplayTestSummary() {
@@ -231,6 +233,13 @@
             counts[result && DISPLAY_RESULT[result.result] ? result.result : 'untested'] += 1;
         });
         Object.entries(counts).forEach(([key, value]) => { elements.testCounts[key].textContent = value; });
+    }
+    function updateTestFilterButtons() {
+        elements.testFilterButtons.forEach(button => {
+            const isActive = elements.testResultFilter.value === button.dataset.testFilter;
+            button.classList.toggle('is-active', isActive);
+            button.setAttribute('aria-pressed', String(isActive));
+        });
     }
     function refreshDisplayTestUi(imageId) {
         updateDisplayTestSummary();
@@ -425,6 +434,10 @@
     function resetPageAndRender() { currentPage = 1; renderList(); }
     elements.search.addEventListener('input', resetPageAndRender);
     elements.testResultFilter.addEventListener('change', resetPageAndRender);
+    elements.testFilterButtons.forEach(button => button.addEventListener('click', () => {
+        elements.testResultFilter.value = elements.testResultFilter.value === button.dataset.testFilter ? 'all' : button.dataset.testFilter;
+        resetPageAndRender();
+    }));
     elements.pageSize.addEventListener('change', resetPageAndRender);
     elements.testScope.addEventListener('change', updateTestScopeButton);
     elements.startDisplayTest.addEventListener('click', startBatchDisplayTest);
