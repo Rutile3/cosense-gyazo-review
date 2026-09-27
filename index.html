@@ -43,17 +43,19 @@
                         <p class="text-secondary small mb-1">読み込み中のプロジェクト</p><h2 id="project-heading" class="h3 mb-0"></h2>
                     </div>
                     <div class="notice mb-4" role="note">
-                        <strong>表示テスト結果は、検査時点でファイルを読み込めたかどうかの記録です。</strong><br>
-                        配信状態や配信再開作業の完了を保証するものではありません。<br>
-                        画像をGyazoで確認し、公開して問題ないものだけ、Gyazo上で手動で「配信を再開する」を押してください。
+                        <strong>表示テスト結果は配信状態を保証しません。</strong>
+                        公開可否はGyazoで確認し、配信再開は手動で行ってください。
                     </div>
                     <h3 id="display-test-heading" class="h5">表示テスト</h3>
-                    <p class="small text-secondary">
-                        ブラウザから <code>i.gyazo.com</code> のPNG・JPG・GIF・MP4ファイルを読み込みます。<br>
-                        表示テストには、シークレットブラウザ、またはGyazoとCosenseのどちらにもログインしていないブラウザを使用してください。<br>
-                        「表示できない」は配信停止の確定結果ではなく、画像形式、通信障害、アクセス制限、時間切れなどでも起こります。<br>
-                        「表示できた」場合も代替画像の可能性があるため、プレビューを確認してください。
-                    </p>
+                    <p class="small text-secondary mb-2">PNG・JPG・GIF・MP4を、シークレットブラウザまたはGyazo・Cosenseに未ログインのブラウザで検査してください。</p>
+                    <details class="test-details mb-3">
+                        <summary>判定方法と注意事項</summary>
+                        <ul class="small text-secondary mb-0 mt-2">
+                            <li><code>i.gyazo.com</code> から各形式を読み込み、いずれかを表示できるか検査します。</li>
+                            <li>「表示できない」は、通信障害、アクセス制限、時間切れなどでも起こります。</li>
+                            <li>「表示できた」場合も代替画像の可能性があるため、プレビューを確認してください。</li>
+                        </ul>
+                    </details>
                     <div class="test-summary-grid mb-3" aria-label="表示テスト件数">
                         <div><span>未判定</span><strong id="test-count-untested">0</strong></div>
                         <div><span>表示できた</span><strong id="test-count-available">0</strong></div>
