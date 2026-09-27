@@ -75,6 +75,7 @@
      * @property {Record<string, DisplayTestResult>} displayTestResults
      * @property {Record<string, string>} displayPreviewUrls
      * @property {number} currentPage
+     * @property {number} fileLoadSequence
      * @property {number} sessionVersion
      * @property {number} requestSequence
      * @property {number} batchSequence
@@ -171,6 +172,7 @@
         // プレビューURLは現在のセッションだけで使い、localStorageには保存しない。
         displayPreviewUrls: {},
         currentPage: 1,
+        fileLoadSequence: 0,
         // JSON切り替え時に加算し、古い非同期リクエストの結果を破棄する。
         sessionVersion: 0,
         requestSequence: 0,
@@ -179,6 +181,24 @@
         activeTestRequests: new Map(),
         testingImageIds: new Set()
     };
+
+    /**
+     * JSON読み込みごとの識別子を発行する。
+     * @returns {number}
+     */
+    function beginFileLoad() {
+        state.fileLoadSequence += 1;
+        return state.fileLoadSequence;
+    }
+
+    /**
+     * 指定したJSON読み込みが、現在も最新か判定する。
+     * @param {number} loadId
+     * @returns {boolean}
+     */
+    function isCurrentFileLoad(loadId) {
+        return loadId === state.fileLoadSequence;
+    }
 
     /**
      * 現在のページ番号を正の整数へ正規化して更新する。
@@ -890,6 +910,7 @@
         clearMessage();
         elements.workspace.classList.add('d-none');
         if (!file) return;
+        const loadId = beginFileLoad();
         setInputCompact(false);
         invalidateDisplayTests();
         if (!file.name.toLowerCase().endsWith('.json') && file.type !== 'application/json') {
@@ -898,6 +919,7 @@
         }
         try {
             const text = await file.text();
+            if (!isCurrentFileLoad(loadId)) return;
             let data;
             try {
                 data = JSON.parse(text);
@@ -906,9 +928,10 @@
             }
             loadExport(data);
         } catch (error) {
+            if (!isCurrentFileLoad(loadId)) return;
             showMessage(error instanceof Error ? error.message : 'ファイルの読み込みに失敗しました。', 'danger');
         } finally {
-            elements.fileInput.value = '';
+            if (isCurrentFileLoad(loadId)) elements.fileInput.value = '';
         }
     }
 
