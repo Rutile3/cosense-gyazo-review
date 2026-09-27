@@ -70,12 +70,20 @@
         projectHeading: document.getElementById('project-heading'), imageList: document.getElementById('image-list'),
         emptyFilter: document.getElementById('empty-filter'), search: document.getElementById('search'),
         testResultFilter: document.getElementById('test-result-filter'), pageSize: document.getElementById('page-size'),
-        topPagination: document.getElementById('top-pagination'), topFirstPage: document.getElementById('top-first-page'),
-        topPreviousPage: document.getElementById('top-previous-page'), topNextPage: document.getElementById('top-next-page'),
-        topLastPage: document.getElementById('top-last-page'), topPageInfo: document.getElementById('top-page-info'),
-        bottomPagination: document.getElementById('bottom-pagination'), firstPage: document.getElementById('first-page'),
-        previousPage: document.getElementById('previous-page'), nextPage: document.getElementById('next-page'),
-        lastPage: document.getElementById('last-page'), pageInfo: document.getElementById('page-info'),
+        paginationControls: [
+            {
+                container: document.getElementById('top-pagination'),
+                first: document.getElementById('top-first-page'), previous: document.getElementById('top-previous-page'),
+                next: document.getElementById('top-next-page'), last: document.getElementById('top-last-page'),
+                info: document.getElementById('top-page-info')
+            },
+            {
+                container: document.getElementById('bottom-pagination'),
+                first: document.getElementById('first-page'), previous: document.getElementById('previous-page'),
+                next: document.getElementById('next-page'), last: document.getElementById('last-page'),
+                info: document.getElementById('page-info')
+            }
+        ],
         exportCsv: document.getElementById('export-csv'), visibleCount: document.getElementById('visible-count'),
         testScope: document.getElementById('test-scope'), startDisplayTest: document.getElementById('start-display-test'),
         stopDisplayTest: document.getElementById('stop-display-test'), testProgress: document.getElementById('test-progress'),
@@ -362,10 +370,14 @@
         elements.emptyFilter.classList.toggle('d-none', filtered.length !== 0);
         elements.visibleCount.textContent = filtered.length === 0 ? `0 / ${state.images.length}件` : `${start + 1}〜${start + visible.length} / ${filtered.length}件`;
         const hidePagination = filtered.length === 0 || elements.pageSize.value === 'all';
-        [elements.topPagination, elements.bottomPagination].forEach(pagination => pagination.classList.toggle('d-none', hidePagination));
-        [elements.topPageInfo, elements.pageInfo].forEach(info => { info.textContent = `${state.currentPage} / ${totalPages}ページ`; });
-        [elements.topFirstPage, elements.firstPage, elements.topPreviousPage, elements.previousPage].forEach(button => { button.disabled = state.currentPage === 1; });
-        [elements.topNextPage, elements.nextPage, elements.topLastPage, elements.lastPage].forEach(button => { button.disabled = state.currentPage === totalPages; });
+        elements.paginationControls.forEach(controls => {
+            controls.container.classList.toggle('d-none', hidePagination);
+            controls.info.textContent = `${state.currentPage} / ${totalPages}ページ`;
+            controls.first.disabled = state.currentPage === 1;
+            controls.previous.disabled = state.currentPage === 1;
+            controls.next.disabled = state.currentPage === totalPages;
+            controls.last.disabled = state.currentPage === totalPages;
+        });
         updateTestFilterButtons();
         updateTestScopeButton();
     }
@@ -630,10 +642,12 @@
         state.currentPage = Math.max(Math.ceil(filteredCount / pageSize), 1);
         renderList();
     }
-    [elements.topFirstPage, elements.firstPage].forEach(button => button.addEventListener('click', moveToFirstPage));
-    [elements.topPreviousPage, elements.previousPage].forEach(button => button.addEventListener('click', moveToPreviousPage));
-    [elements.topNextPage, elements.nextPage].forEach(button => button.addEventListener('click', moveToNextPage));
-    [elements.topLastPage, elements.lastPage].forEach(button => button.addEventListener('click', moveToLastPage));
+    elements.paginationControls.forEach(controls => {
+        controls.first.addEventListener('click', moveToFirstPage);
+        controls.previous.addEventListener('click', moveToPreviousPage);
+        controls.next.addEventListener('click', moveToNextPage);
+        controls.last.addEventListener('click', moveToLastPage);
+    });
     elements.exportCsv.addEventListener('click', exportCsv);
     window.CosenseGyazoReview = Object.freeze({ extractImages, validateExport, getCosensePageUrl, csvEscape });
 }());
