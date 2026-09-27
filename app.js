@@ -227,6 +227,19 @@
     }
 
     /**
+     * localStorageから読み込んだ値が表示テスト結果として有効か検証する。
+     * @param {unknown} value
+     * @returns {value is DisplayTestResult}
+     */
+    function isValidDisplayTestResult(value) {
+        if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+        const candidate = /** @type {Partial<DisplayTestResult>} */ (value);
+        const hasValidResult = Object.prototype.hasOwnProperty.call(DISPLAY_RESULT, candidate.result);
+        const hasValidFormat = candidate.format === undefined || DISPLAY_FORMATS.includes(candidate.format);
+        return hasValidResult && typeof candidate.testedAt === 'string' && hasValidFormat;
+    }
+
+    /**
      * 現在のJSONに含まれる画像だけを対象に、保存済みの表示テスト結果を復元する。
      * @param {string} projectName
      * @param {Set<string>} validImageIds
@@ -236,10 +249,9 @@
         try {
             const stored = JSON.parse(localStorage.getItem(getTestStorageKey(projectName)) || '{}');
             if (!stored || typeof stored !== 'object' || Array.isArray(stored)) return {};
-            return Object.fromEntries(Object.entries(stored).filter(([id, value]) =>
-                validImageIds.has(id) && value && DISPLAY_RESULT[value.result] && typeof value.testedAt === 'string' &&
-                (value.format === undefined || DISPLAY_FORMATS.includes(value.format))
-            ));
+            return Object.fromEntries(
+                Object.entries(stored).filter(([id, value]) => validImageIds.has(id) && isValidDisplayTestResult(value))
+            );
         } catch (error) {
             showMessage('保存済みの表示テスト結果を読み込めませんでした。表示結果は未判定として扱います。', 'warning');
             return {};
@@ -920,7 +932,8 @@
         paginateImages,
         csvEscape,
         createCsvRows,
-        createCsvText
+        createCsvText,
+        isValidDisplayTestResult
     });
     bindEvents();
 }());
