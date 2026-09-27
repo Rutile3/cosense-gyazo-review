@@ -316,6 +316,7 @@
         elements.testScope.disabled = isRunning;
         elements.startDisplayTest.disabled = isRunning;
         elements.stopDisplayTest.disabled = !isRunning;
+        elements.stopDisplayTest.classList.toggle('d-none', !isRunning);
         if (!isRunning) updateTestScopeButton();
     }
     async function startBatchDisplayTest() {

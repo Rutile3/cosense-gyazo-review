@@ -28,6 +28,8 @@ body { margin: 0; color: #20252b; background: #efefef; font-family: system-ui, -
 .test-summary-grid span { color: var(--muted); font-size: .8rem; }
 .test-summary-grid strong { margin-top: .15rem; font-size: 1.25rem; }
 .test-details summary { color: var(--muted); font-size: .875rem; cursor: pointer; }
+.test-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .5rem 1rem; }
+.test-primary-actions { display: flex; flex-wrap: wrap; gap: .5rem; }
 .test-progress { display: flex; align-items: center; gap: .75rem; margin-top: 1rem; }
 .test-progress progress { flex: 1; min-width: 8rem; }
 .display-test-result { padding: .65rem .75rem; border-radius: .4rem; background: #f5f6f8; }
@@ -39,5 +41,5 @@ body { margin: 0; color: #20252b; background: #efefef; font-family: system-ui, -
 .empty-state { padding: 3rem 1rem; color: var(--muted); text-align: center; }
 .pagination-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 1rem; padding: 1rem; border-top: 1px solid var(--border); }
 #top-pagination { border-bottom: 1px solid var(--border); }
-@media (max-width: 767.98px) { .test-summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .image-item { grid-template-columns: 1fr; } }
+@media (max-width: 767.98px) { .test-summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .test-actions, .test-primary-actions { align-items: stretch; flex-direction: column; } .test-actions .btn { width: 100%; } .image-item { grid-template-columns: 1fr; } }
 @media (max-width: 420px) { .navbar-brand { max-width: 75%; font-size: 1rem; white-space: normal; } }

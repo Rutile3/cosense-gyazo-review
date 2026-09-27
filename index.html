@@ -71,9 +71,11 @@
                                 <option value="all">抽出した全画像</option>
                             </select>
                         </div>
-                        <div class="col-md-7 d-flex flex-wrap gap-2">
-                            <button id="start-display-test" type="button" class="btn btn-outline-primary">対象を順次テスト</button>
-                            <button id="stop-display-test" type="button" class="btn btn-outline-secondary" disabled>テストを停止</button>
+                        <div class="col-md-7 test-actions">
+                            <div class="test-primary-actions">
+                                <button id="start-display-test" type="button" class="btn btn-primary">対象を順次テスト</button>
+                                <button id="stop-display-test" type="button" class="btn btn-outline-secondary d-none" disabled>テストを停止</button>
+                            </div>
                             <button id="export-csv" type="button" class="btn btn-outline-secondary">表示テスト結果をCSV出力</button>
                         </div>
                     </div>
