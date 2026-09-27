@@ -98,8 +98,16 @@
     const TEST_STORAGE_PREFIX = 'cosense-gyazo-review:display-tests:v1:';
     const TEST_CONCURRENCY = 3;
     const SEARCH_DEBOUNCE_MS = 1000;
+    const BATCH_UI_REFRESH_INTERVAL_MS = 300;
+    const BATCH_SAVE_INTERVAL_MS = 1000;
     /** @type {number|null} */
     let searchRenderTimer = null;
+    /** @type {number|null} */
+    let batchUiRefreshTimer = null;
+    /** @type {number|null} */
+    let batchSaveTimer = null;
+    let batchUiRefreshPending = false;
+    let batchSavePending = false;
     /**
      * 必須のDOM要素をIDで取得し、HTMLとの不整合を初期化時に検出する。
      * @param {string} id
@@ -516,12 +524,60 @@
         else updateTestScopeButton();
     }
 
+    /** 一括テスト中に予約された画面更新を実行する。 */
+    function flushScheduledBatchUiRefresh() {
+        if (batchUiRefreshTimer !== null) clearTimeout(batchUiRefreshTimer);
+        batchUiRefreshTimer = null;
+        if (!batchUiRefreshPending) return;
+        batchUiRefreshPending = false;
+        updateDisplayTestSummary();
+        renderList();
+    }
+
+    /** 一括テスト中の画面更新を一定間隔にまとめる。 */
+    function scheduleBatchUiRefresh() {
+        batchUiRefreshPending = true;
+        if (batchUiRefreshTimer !== null) return;
+        batchUiRefreshTimer = setTimeout(flushScheduledBatchUiRefresh, BATCH_UI_REFRESH_INTERVAL_MS);
+    }
+
+    /** 一括テスト中に予約された保存を実行する。 */
+    function flushScheduledBatchSave() {
+        if (batchSaveTimer !== null) clearTimeout(batchSaveTimer);
+        batchSaveTimer = null;
+        if (!batchSavePending) return;
+        batchSavePending = false;
+        saveDisplayTestResults();
+    }
+
+    /** 一括テスト中のlocalStorage保存を一定間隔にまとめる。 */
+    function scheduleBatchSave() {
+        batchSavePending = true;
+        if (batchSaveTimer !== null) return;
+        batchSaveTimer = setTimeout(flushScheduledBatchSave, BATCH_SAVE_INTERVAL_MS);
+    }
+
     /**
-     * 判定結果を現在のプロジェクトへ保存する。
+     * 一括テストの保留中処理を確定し、必要なら現在の画面を更新する。
+     * @param {{refreshUi?: boolean}} [options]
+     */
+    function flushPendingBatchUpdates({ refreshUi = true } = {}) {
+        flushScheduledBatchSave();
+        if (batchUiRefreshTimer !== null) clearTimeout(batchUiRefreshTimer);
+        batchUiRefreshTimer = null;
+        batchUiRefreshPending = false;
+        if (refreshUi) {
+            updateDisplayTestSummary();
+            renderList();
+        }
+    }
+
+    /**
+     * 判定結果を現在のプロジェクトの画面状態へ反映する。
      * @param {string} imageId
      * @param {MediaTestOutcome} outcome
      */
-    function saveDisplayTestOutcome(imageId, outcome) {
+    function recordDisplayTestOutcome(imageId, outcome) {
         if (!isStoredDisplayTestResult(outcome.result)) return;
         /** @type {DisplayTestResult} */
         const result = {
@@ -530,7 +586,6 @@
         };
         if (outcome.format) result.format = outcome.format;
         setDisplayTestResult(imageId, result, outcome.previewUrl);
-        saveDisplayTestResults();
     }
 
     /** 実行中のリクエストと判定中表示を、同じリクエストIDの場合だけ解除する。 */
@@ -547,14 +602,22 @@
      * @param {GyazoImage} image
      * @param {number} requestId
      * @param {number} requestSession
+     * @param {number|null} runId
      * @param {MediaTestOutcome} outcome
      * @returns {'available'|'unavailable'|'timeout'|'cancelled'}
      */
-    function applyDisplayTestOutcome(image, requestId, requestSession, outcome) {
+    function applyDisplayTestOutcome(image, requestId, requestSession, runId, outcome) {
         clearDisplayTestRequest(image.id, requestId);
         const isCurrent = requestSession === state.sessionVersion && state.images.some(item => item.id === image.id);
-        if (isCurrent && isStoredDisplayTestResult(outcome.result)) saveDisplayTestOutcome(image.id, outcome);
-        if (isCurrent) refreshDisplayTestUi(image.id);
+        if (isCurrent && isStoredDisplayTestResult(outcome.result)) {
+            recordDisplayTestOutcome(image.id, outcome);
+            if (runId === null) saveDisplayTestResults();
+            else scheduleBatchSave();
+        }
+        if (isCurrent) {
+            if (runId === null) refreshDisplayTestUi(image.id);
+            else scheduleBatchUiRefresh();
+        }
         return outcome.result;
     }
 
@@ -575,8 +638,9 @@
         };
         state.activeTestRequests.set(image.id, { requestId: mediaTest.requestId, runId, cancel });
         state.testingImageIds.add(image.id);
-        refreshDisplayTestUi(image.id);
-        return mediaTest.promise.then(outcome => applyDisplayTestOutcome(image, mediaTest.requestId, requestSession, outcome));
+        if (runId === null) refreshDisplayTestUi(image.id);
+        else scheduleBatchUiRefresh();
+        return mediaTest.promise.then(outcome => applyDisplayTestOutcome(image, mediaTest.requestId, requestSession, runId, outcome));
     }
     function runSingleDisplayTest(image) {
         performDisplayTest(image, null);
@@ -637,7 +701,7 @@
         if (state.batchRun !== run) return;
         state.batchRun = null;
         setBatchControls(false);
-        renderList();
+        flushPendingBatchUpdates();
         elements.testProgressText.textContent = `完了: ${run.completed} / ${run.total}件（${formatBatchResultCounts(run.counts)}）`;
     }
     function stopBatchDisplayTest() {
@@ -649,7 +713,7 @@
         });
         state.batchRun = null;
         setBatchControls(false);
-        renderList();
+        flushPendingBatchUpdates();
         elements.testProgressText.textContent = `停止しました: ${run.completed} / ${run.total}件を完了`;
     }
 
@@ -658,6 +722,7 @@
      * JSONの切り替え前に必ず呼び出す。
      */
     function invalidateDisplayTests() {
+        flushPendingBatchUpdates({ refreshUi: false });
         state.sessionVersion += 1;
         if (state.batchRun) state.batchRun.stopped = true;
         state.activeTestRequests.forEach(request => request.cancel());
