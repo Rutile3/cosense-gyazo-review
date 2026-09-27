@@ -16,7 +16,18 @@
      */
 
     /**
-     * @typedef {'all'|'untested'|'available'|'unavailable'|'timeout'} DisplayTestFilter
+     * @typedef {'untested'|'available'|'unavailable'|'timeout'} DisplayTestResultName
+     */
+
+    /**
+     * @typedef {'all'|DisplayTestResultName} DisplayTestFilter
+     */
+
+    /**
+     * @typedef {Object} DisplayTestResultDefinition
+     * @property {string} label
+     * @property {boolean} stored
+     * @property {boolean} includeInSummary
      */
 
     /**
@@ -73,11 +84,19 @@
      */
 
     // 表示テストはHTTPステータスではなく、ブラウザのメディア読込イベントで判定する。
-    const DISPLAY_RESULT = Object.freeze({
-        available: '表示できた',
-        unavailable: '表示できない',
-        timeout: '時間切れ'
+    /** @type {Readonly<Record<DisplayTestResultName, Readonly<DisplayTestResultDefinition>>>} */
+    const DISPLAY_TEST_RESULT_CONFIG = Object.freeze({
+        untested: Object.freeze({ label: '未判定', stored: false, includeInSummary: true }),
+        available: Object.freeze({ label: '表示できた', stored: true, includeInSummary: true }),
+        unavailable: Object.freeze({ label: '表示できない', stored: true, includeInSummary: true }),
+        timeout: Object.freeze({ label: '時間切れ', stored: true, includeInSummary: true })
     });
+    const DISPLAY_TEST_SUMMARY_KEYS = Object.freeze(
+        Object.keys(DISPLAY_TEST_RESULT_CONFIG).filter(key => DISPLAY_TEST_RESULT_CONFIG[key].includeInSummary)
+    );
+    const DISPLAY_TEST_OUTCOME_KEYS = Object.freeze(
+        Object.keys(DISPLAY_TEST_RESULT_CONFIG).filter(key => DISPLAY_TEST_RESULT_CONFIG[key].stored)
+    );
     /** @type {ReadonlyArray<DisplayTestFormat>} */
     const DISPLAY_FORMATS = Object.freeze(['png', 'jpg', 'gif', 'mp4']);
     const TEST_STORAGE_PREFIX = 'cosense-gyazo-review:display-tests:v1:';
@@ -140,7 +159,7 @@
         testProgressBar: getRequiredElement('test-progress-bar'),
         testProgressText: getRequiredElement('test-progress-text'),
         testCounts: Object.fromEntries(
-            ['untested', ...Object.keys(DISPLAY_RESULT)].map(key => [key, getRequiredElement(`test-count-${key}`)])
+            DISPLAY_TEST_SUMMARY_KEYS.map(key => [key, getRequiredElement(`test-count-${key}`)])
         ),
         testFilterButtons: Array.from(document.querySelectorAll('[data-test-filter]'))
     };
@@ -238,6 +257,43 @@
     }
 
     /**
+     * 表示テスト結果名に対応する定義を返す。
+     * @param {unknown} result
+     * @returns {DisplayTestResultDefinition|null}
+     */
+    function getDisplayTestResultDefinition(result) {
+        if (typeof result !== 'string') return null;
+        if (!Object.prototype.hasOwnProperty.call(DISPLAY_TEST_RESULT_CONFIG, result)) return null;
+        return DISPLAY_TEST_RESULT_CONFIG[/** @type {DisplayTestResultName} */ (result)];
+    }
+
+    /**
+     * @param {unknown} result
+     * @returns {boolean}
+     */
+    function isStoredDisplayTestResult(result) {
+        return getDisplayTestResultDefinition(result)?.stored === true;
+    }
+
+    /**
+     * @param {readonly string[]} keys
+     * @returns {Record<string, number>}
+     */
+    function createResultCounts(keys) {
+        return Object.fromEntries(keys.map(key => [key, 0]));
+    }
+
+    /**
+     * @param {Record<string, number>} counts
+     * @returns {string}
+     */
+    function formatBatchResultCounts(counts) {
+        return DISPLAY_TEST_OUTCOME_KEYS
+            .map(key => `${DISPLAY_TEST_RESULT_CONFIG[key].label} ${counts[key]}`)
+            .join('、');
+    }
+
+    /**
      * localStorageから読み込んだ値が表示テスト結果として有効か検証する。
      * @param {unknown} value
      * @returns {value is DisplayTestResult}
@@ -245,9 +301,8 @@
     function isValidDisplayTestResult(value) {
         if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
         const candidate = /** @type {Partial<DisplayTestResult>} */ (value);
-        const hasValidResult = Object.prototype.hasOwnProperty.call(DISPLAY_RESULT, candidate.result);
         const hasValidFormat = candidate.format === undefined || DISPLAY_FORMATS.includes(candidate.format);
-        return hasValidResult && typeof candidate.testedAt === 'string' && hasValidFormat;
+        return isStoredDisplayTestResult(candidate.result) && typeof candidate.testedAt === 'string' && hasValidFormat;
     }
 
     /**
@@ -277,7 +332,7 @@
         const minimal = {};
         state.images.forEach(image => {
             const value = state.displayTestResults[image.id];
-            if (value && DISPLAY_RESULT[value.result]) {
+            if (value && isStoredDisplayTestResult(value.result)) {
                 minimal[image.id] = { result: value.result, testedAt: value.testedAt };
                 if (value.format) minimal[image.id].format = value.format;
             }
@@ -338,7 +393,8 @@
         resultBox.dataset.result = isTesting ? 'testing' : (result ? result.result : 'untested');
         const resultLabel = document.createElement('strong');
         const formatLabel = result && result.result === 'available' && result.format ? `（${result.format.toUpperCase()}）` : '';
-        resultLabel.textContent = isTesting ? '判定中…' : (result ? `${DISPLAY_RESULT[result.result]}${formatLabel}` : '未判定');
+        const resultDefinition = getDisplayTestResultDefinition(result?.result) || DISPLAY_TEST_RESULT_CONFIG.untested;
+        resultLabel.textContent = isTesting ? '判定中…' : `${resultDefinition.label}${formatLabel}`;
         resultBox.append(resultLabel);
         if (result) {
             const testedAt = document.createElement('time');
@@ -526,10 +582,11 @@
         updateTestScopeButton();
     }
     function updateDisplayTestSummary() {
-        const counts = { untested: 0, available: 0, unavailable: 0, timeout: 0 };
+        const counts = createResultCounts(DISPLAY_TEST_SUMMARY_KEYS);
         state.images.forEach(image => {
             const result = state.displayTestResults[image.id];
-            counts[result && DISPLAY_RESULT[result.result] ? result.result : 'untested'] += 1;
+            const key = result && isStoredDisplayTestResult(result.result) ? result.result : 'untested';
+            counts[key] += 1;
         });
         Object.entries(counts).forEach(([key, value]) => {
             elements.testCounts[key].textContent = value;
@@ -618,7 +675,7 @@
      * @param {MediaTestOutcome} outcome
      */
     function saveDisplayTestOutcome(imageId, outcome) {
-        if (!DISPLAY_RESULT[outcome.result]) return;
+        if (!isStoredDisplayTestResult(outcome.result)) return;
         state.displayTestResults[imageId] = { result: outcome.result, testedAt: new Date().toISOString() };
         if (outcome.format) state.displayTestResults[imageId].format = outcome.format;
         if (outcome.result === 'available' && outcome.previewUrl) state.displayPreviewUrls[imageId] = outcome.previewUrl;
@@ -646,7 +703,7 @@
     function applyDisplayTestOutcome(image, requestId, requestSession, outcome) {
         clearDisplayTestRequest(image.id, requestId);
         const isCurrent = requestSession === state.sessionVersion && state.images.some(item => item.id === image.id);
-        if (isCurrent && DISPLAY_RESULT[outcome.result]) saveDisplayTestOutcome(image.id, outcome);
+        if (isCurrent && isStoredDisplayTestResult(outcome.result)) saveDisplayTestOutcome(image.id, outcome);
         if (isCurrent) refreshDisplayTestUi(image.id);
         return outcome.result;
     }
@@ -677,7 +734,7 @@
     function updateBatchProgress(run) {
         elements.testProgressBar.max = Math.max(run.total, 1);
         elements.testProgressBar.value = run.completed;
-        elements.testProgressText.textContent = `${run.completed} / ${run.total}件（表示できた ${run.counts.available}、表示できない ${run.counts.unavailable}、時間切れ ${run.counts.timeout}）`;
+        elements.testProgressText.textContent = `${run.completed} / ${run.total}件（${formatBatchResultCounts(run.counts)}）`;
     }
     function setBatchControls(isRunning) {
         elements.testScope.disabled = isRunning;
@@ -698,7 +755,7 @@
             run.nextIndex += 1;
             const outcome = await performDisplayTest(image, run.id);
             if (run.stopped) return;
-            if (DISPLAY_RESULT[outcome]) {
+            if (isStoredDisplayTestResult(outcome)) {
                 run.completed += 1;
                 run.counts[outcome] += 1;
                 updateBatchProgress(run);
@@ -718,7 +775,7 @@
             nextIndex: 0,
             completed: 0,
             stopped: false,
-            counts: { available: 0, unavailable: 0, timeout: 0 }
+            counts: createResultCounts(DISPLAY_TEST_OUTCOME_KEYS)
         };
         state.batchRun = run;
         elements.testProgress.classList.remove('d-none');
@@ -731,7 +788,7 @@
         state.batchRun = null;
         setBatchControls(false);
         renderList();
-        elements.testProgressText.textContent = `完了: ${run.completed} / ${run.total}件（表示できた ${run.counts.available}、表示できない ${run.counts.unavailable}、時間切れ ${run.counts.timeout}）`;
+        elements.testProgressText.textContent = `完了: ${run.completed} / ${run.total}件（${formatBatchResultCounts(run.counts)}）`;
     }
     function stopBatchDisplayTest() {
         const run = state.batchRun;
@@ -835,10 +892,11 @@
     function createCsvRows(imageItems, testResults) {
         return imageItems.map(image => {
             const testResult = testResults[image.id];
+            const resultDefinition = getDisplayTestResultDefinition(testResult?.result) || DISPLAY_TEST_RESULT_CONFIG.untested;
             return [
                 image.id,
                 image.url,
-                testResult ? DISPLAY_RESULT[testResult.result] : '未判定',
+                resultDefinition.label,
                 testResult ? testResult.testedAt : '',
                 Array.from(new Set(image.sources.map(source => source.pageTitle))).join(' / ')
             ];
