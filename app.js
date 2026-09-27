@@ -180,6 +180,46 @@
         testingImageIds: new Set()
     };
 
+    /**
+     * 現在のページ番号を正の整数へ正規化して更新する。
+     * @param {number} page
+     */
+    function setCurrentPage(page) {
+        const normalizedPage = Number.isFinite(page) ? Math.trunc(page) : 1;
+        state.currentPage = Math.max(normalizedPage, 1);
+    }
+
+    /**
+     * 表示テスト結果と、現在のセッションだけで使うプレビューURLを同時に更新する。
+     * @param {string} imageId
+     * @param {DisplayTestResult} result
+     * @param {string|undefined} previewUrl
+     */
+    function setDisplayTestResult(imageId, result, previewUrl) {
+        state.displayTestResults[imageId] = result;
+        if (result.result === 'available' && previewUrl) {
+            state.displayPreviewUrls[imageId] = previewUrl;
+        } else {
+            delete state.displayPreviewUrls[imageId];
+        }
+    }
+
+    /**
+     * 読み込んだプロジェクトに合わせて、一覧と表示テスト状態を初期化する。
+     * @param {string} projectName
+     * @param {GyazoImage[]} images
+     */
+    function initializeProjectState(projectName, images) {
+        state.currentProject = projectName;
+        state.images = images;
+        state.displayTestResults = loadDisplayTestResults(
+            projectName,
+            new Set(images.map(image => image.id))
+        );
+        state.displayPreviewUrls = {};
+        setCurrentPage(1);
+    }
+
     function showMessage(text, type) {
         elements.message.textContent = text;
         elements.message.className = `alert alert-${type} mt-3 mb-0`;
@@ -561,7 +601,7 @@
     /** 一覧、件数表示、ページャー、絞り込み状態をまとめて再描画する。 */
     function renderList() {
         const view = getCurrentListView();
-        state.currentPage = view.page;
+        setCurrentPage(view.page);
         const fragment = document.createDocumentFragment();
         view.items.forEach(image => fragment.append(createImageElement(image)));
         elements.imageList.replaceChildren(fragment);
@@ -676,10 +716,13 @@
      */
     function saveDisplayTestOutcome(imageId, outcome) {
         if (!isStoredDisplayTestResult(outcome.result)) return;
-        state.displayTestResults[imageId] = { result: outcome.result, testedAt: new Date().toISOString() };
-        if (outcome.format) state.displayTestResults[imageId].format = outcome.format;
-        if (outcome.result === 'available' && outcome.previewUrl) state.displayPreviewUrls[imageId] = outcome.previewUrl;
-        else delete state.displayPreviewUrls[imageId];
+        /** @type {DisplayTestResult} */
+        const result = {
+            result: /** @type {'available'|'unavailable'|'timeout'} */ (outcome.result),
+            testedAt: new Date().toISOString()
+        };
+        if (outcome.format) result.format = outcome.format;
+        setDisplayTestResult(imageId, result, outcome.previewUrl);
         saveDisplayTestResults();
     }
 
@@ -826,13 +869,7 @@
         validateExport(data);
         const extracted = extractImages(data);
         if (extracted.length === 0) throw new Error('有効なGyazo画像URLが見つかりませんでした。32桁の画像IDを含むURLがあるか確認してください。');
-        Object.assign(state, {
-            currentProject: data.name,
-            images: extracted,
-            displayTestResults: loadDisplayTestResults(data.name, new Set(extracted.map(image => image.id))),
-            displayPreviewUrls: {},
-            currentPage: 1
-        });
+        initializeProjectState(data.name, extracted);
         elements.projectHeading.textContent = data.displayName || data.name;
         elements.search.value = '';
         elements.testResultFilter.value = 'all';
@@ -940,25 +977,25 @@
     }
 
     function resetPageAndRender() {
-        state.currentPage = 1;
+        setCurrentPage(1);
         renderList();
     }
     function moveToFirstPage() {
-        state.currentPage = 1;
+        setCurrentPage(1);
         renderList();
     }
     function moveToPreviousPage() {
         if (state.currentPage > 1) {
-            state.currentPage -= 1;
+            setCurrentPage(state.currentPage - 1);
             renderList();
         }
     }
     function moveToNextPage() {
-        state.currentPage += 1;
+        setCurrentPage(state.currentPage + 1);
         renderList();
     }
     function moveToLastPage() {
-        state.currentPage = getCurrentListView().totalPages;
+        setCurrentPage(getCurrentListView().totalPages);
         renderList();
     }
 
