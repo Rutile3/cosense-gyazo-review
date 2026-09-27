@@ -19,7 +19,7 @@
         topLastPage: document.getElementById('top-last-page'), topPageInfo: document.getElementById('top-page-info'),
         bottomPagination: document.getElementById('bottom-pagination'), firstPage: document.getElementById('first-page'),
         previousPage: document.getElementById('previous-page'), nextPage: document.getElementById('next-page'),
-        lastPage: document.getElementById('last-page'), pageInfo: document.getElementById('page-info'), openNext: document.getElementById('open-next'),
+        lastPage: document.getElementById('last-page'), pageInfo: document.getElementById('page-info'),
         exportCsv: document.getElementById('export-csv'), visibleCount: document.getElementById('visible-count'),
         testScope: document.getElementById('test-scope'), startDisplayTest: document.getElementById('start-display-test'),
         stopDisplayTest: document.getElementById('stop-display-test'), testProgress: document.getElementById('test-progress'),
@@ -240,7 +240,6 @@
         const counts = { total: images.length, unchecked: 0, completed: 0, pending: 0, excluded: 0 };
         images.forEach(image => { counts[getStatus(image.id)] += 1; });
         Object.entries(counts).forEach(([key, value]) => { elements.counts[key].textContent = value; });
-        elements.openNext.disabled = counts.unchecked === 0; elements.openNext.textContent = counts.unchecked === 0 ? '未確認はありません' : '次の未確認を開く';
     }
     function updateDisplayTestSummary() {
         const counts = { untested: 0, available: 0, unavailable: 0, timeout: 0 };
@@ -440,7 +439,6 @@
     [elements.topPreviousPage, elements.previousPage].forEach(button => button.addEventListener('click', moveToPreviousPage));
     [elements.topNextPage, elements.nextPage].forEach(button => button.addEventListener('click', moveToNextPage));
     [elements.topLastPage, elements.lastPage].forEach(button => button.addEventListener('click', moveToLastPage));
-    elements.openNext.addEventListener('click', () => { const next = images.find(image => getStatus(image.id) === 'unchecked'); if (next) window.open(next.url, '_blank', 'noopener,noreferrer'); });
     elements.exportCsv.addEventListener('click', exportCsv);
     window.CosenseGyazoReview = Object.freeze({ extractImages, validateExport, getCosensePageUrl, csvEscape });
 }());

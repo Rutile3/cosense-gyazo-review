@@ -1,4 +1,4 @@
-:root { --brand: rgba(219, 169, 39, .8); --brand-dark: rgba(180, 133, 20, .9); --border: #d9dee5; --muted: #5f6873; }
+:root { --brand: rgba(219, 169, 39, .8); --border: #d9dee5; --muted: #5f6873; }
 * { box-sizing: border-box; }
 body { margin: 0; color: #20252b; background: #efefef; font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
 .d-none { display: none !important; }
@@ -13,8 +13,6 @@ body { margin: 0; color: #20252b; background: #efefef; font-family: system-ui, -
 .drop-zone { display: flex; min-height: 150px; padding: 1.5rem; flex-direction: column; align-items: center; justify-content: center; gap: .35rem; border: 2px dashed #aab2bc; border-radius: .75rem; background: #fafbfc; text-align: center; cursor: pointer; transition: .15s; }
 .drop-zone:hover, .drop-zone:focus, .drop-zone.is-dragging { border-color: var(--brand); background: #fff8e8; outline: none; }
 .drop-zone-title { font-size: 1.05rem; font-weight: 700; }
-.btn-brand { color: #fff; background: var(--brand); border-color: var(--brand); }
-.btn-brand:hover, .btn-brand:focus { color: #fff; background: var(--brand-dark); border-color: var(--brand-dark); }
 .notice { padding: 1rem 1.15rem; border-left: 5px solid var(--brand); border-radius: .35rem; background: #fff4d6; }
 .summary-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: .75rem; }
 .summary-card { padding: 1rem; border: 1px solid var(--border); border-top: 4px solid #65707c; border-radius: .6rem; background: #fff; }
