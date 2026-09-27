@@ -10,8 +10,9 @@
         projectHeading: document.getElementById('project-heading'), imageList: document.getElementById('image-list'),
         emptyFilter: document.getElementById('empty-filter'), search: document.getElementById('search'),
         statusFilter: document.getElementById('status-filter'), pageSize: document.getElementById('page-size'),
-        pagination: document.getElementById('pagination'), previousPage: document.getElementById('previous-page'),
-        nextPage: document.getElementById('next-page'), pageInfo: document.getElementById('page-info'), openNext: document.getElementById('open-next'),
+        pagination: document.getElementById('pagination'), firstPage: document.getElementById('first-page'),
+        previousPage: document.getElementById('previous-page'), nextPage: document.getElementById('next-page'),
+        lastPage: document.getElementById('last-page'), pageInfo: document.getElementById('page-info'), openNext: document.getElementById('open-next'),
         exportCsv: document.getElementById('export-csv'), visibleCount: document.getElementById('visible-count'),
         counts: Object.fromEntries(['total', ...Object.keys(STATUS)].map(key => [key, document.getElementById(`count-${key}`)]))
     };
@@ -121,8 +122,10 @@
         elements.visibleCount.textContent = filtered.length === 0 ? `0 / ${images.length}件` : `${start + 1}〜${start + visible.length} / ${filtered.length}件`;
         elements.pagination.classList.toggle('d-none', filtered.length === 0 || elements.pageSize.value === 'all');
         elements.pageInfo.textContent = `${currentPage} / ${totalPages}ページ`;
+        elements.firstPage.disabled = currentPage === 1;
         elements.previousPage.disabled = currentPage === 1;
         elements.nextPage.disabled = currentPage === totalPages;
+        elements.lastPage.disabled = currentPage === totalPages;
     }
     function updateSummary() {
         const counts = { total: images.length, unchecked: 0, completed: 0, pending: 0, excluded: 0 };
@@ -164,8 +167,15 @@
     elements.search.addEventListener('input', resetPageAndRender);
     elements.statusFilter.addEventListener('change', resetPageAndRender);
     elements.pageSize.addEventListener('change', resetPageAndRender);
+    elements.firstPage.addEventListener('click', () => { currentPage = 1; renderList(); });
     elements.previousPage.addEventListener('click', () => { if (currentPage > 1) { currentPage -= 1; renderList(); } });
     elements.nextPage.addEventListener('click', () => { currentPage += 1; renderList(); });
+    elements.lastPage.addEventListener('click', () => {
+        const filteredCount = getFilteredImages().length;
+        const pageSize = elements.pageSize.value === 'all' ? Math.max(filteredCount, 1) : Number(elements.pageSize.value);
+        currentPage = Math.max(Math.ceil(filteredCount / pageSize), 1);
+        renderList();
+    });
     elements.openNext.addEventListener('click', () => { const next = images.find(image => getStatus(image.id) === 'unchecked'); if (next) window.open(next.url, '_blank', 'noopener,noreferrer'); });
     elements.exportCsv.addEventListener('click', exportCsv);
     window.CosenseGyazoReview = Object.freeze({ extractImages, validateExport, getCosensePageUrl, csvEscape });
