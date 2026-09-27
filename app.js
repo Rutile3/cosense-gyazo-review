@@ -73,7 +73,11 @@
      */
 
     // 表示テストはHTTPステータスではなく、ブラウザのメディア読込イベントで判定する。
-    const DISPLAY_RESULT = Object.freeze({ available: '表示できた', unavailable: '表示できない', timeout: '時間切れ' });
+    const DISPLAY_RESULT = Object.freeze({
+        available: '表示できた',
+        unavailable: '表示できない',
+        timeout: '時間切れ'
+    });
     /** @type {ReadonlyArray<DisplayTestFormat>} */
     const DISPLAY_FORMATS = Object.freeze(['png', 'jpg', 'gif', 'mp4']);
     const TEST_STORAGE_PREFIX = 'cosense-gyazo-review:display-tests:v1:';
@@ -83,32 +87,49 @@
 
     // DOM参照を一か所に集約し、描画処理で同じ要素を再検索しない。
     const elements = {
-        fileInput: document.getElementById('file-input'), dropZone: document.getElementById('drop-zone'),
-        inputExpanded: document.getElementById('input-expanded'), inputCompact: document.getElementById('input-compact'),
-        inputSummary: document.getElementById('input-summary'), chooseAnotherFile: document.getElementById('choose-another-file'),
-        message: document.getElementById('message'), workspace: document.getElementById('workspace'),
-        projectHeading: document.getElementById('project-heading'), imageList: document.getElementById('image-list'),
-        emptyFilter: document.getElementById('empty-filter'), search: document.getElementById('search'),
-        testResultFilter: document.getElementById('test-result-filter'), pageSize: document.getElementById('page-size'),
+        fileInput: document.getElementById('file-input'),
+        dropZone: document.getElementById('drop-zone'),
+        inputExpanded: document.getElementById('input-expanded'),
+        inputCompact: document.getElementById('input-compact'),
+        inputSummary: document.getElementById('input-summary'),
+        chooseAnotherFile: document.getElementById('choose-another-file'),
+        message: document.getElementById('message'),
+        workspace: document.getElementById('workspace'),
+        projectHeading: document.getElementById('project-heading'),
+        imageList: document.getElementById('image-list'),
+        emptyFilter: document.getElementById('empty-filter'),
+        search: document.getElementById('search'),
+        testResultFilter: document.getElementById('test-result-filter'),
+        pageSize: document.getElementById('page-size'),
         paginationControls: [
             {
                 container: document.getElementById('top-pagination'),
-                first: document.getElementById('top-first-page'), previous: document.getElementById('top-previous-page'),
-                next: document.getElementById('top-next-page'), last: document.getElementById('top-last-page'),
+                first: document.getElementById('top-first-page'),
+                previous: document.getElementById('top-previous-page'),
+                next: document.getElementById('top-next-page'),
+                last: document.getElementById('top-last-page'),
                 info: document.getElementById('top-page-info')
             },
             {
                 container: document.getElementById('bottom-pagination'),
-                first: document.getElementById('first-page'), previous: document.getElementById('previous-page'),
-                next: document.getElementById('next-page'), last: document.getElementById('last-page'),
+                first: document.getElementById('first-page'),
+                previous: document.getElementById('previous-page'),
+                next: document.getElementById('next-page'),
+                last: document.getElementById('last-page'),
                 info: document.getElementById('page-info')
             }
         ],
-        exportCsv: document.getElementById('export-csv'), visibleCount: document.getElementById('visible-count'),
-        testScope: document.getElementById('test-scope'), startDisplayTest: document.getElementById('start-display-test'),
-        stopDisplayTest: document.getElementById('stop-display-test'), testProgress: document.getElementById('test-progress'),
-        testProgressBar: document.getElementById('test-progress-bar'), testProgressText: document.getElementById('test-progress-text'),
-        testCounts: Object.fromEntries(['untested', ...Object.keys(DISPLAY_RESULT)].map(key => [key, document.getElementById(`test-count-${key}`)])),
+        exportCsv: document.getElementById('export-csv'),
+        visibleCount: document.getElementById('visible-count'),
+        testScope: document.getElementById('test-scope'),
+        startDisplayTest: document.getElementById('start-display-test'),
+        stopDisplayTest: document.getElementById('stop-display-test'),
+        testProgress: document.getElementById('test-progress'),
+        testProgressBar: document.getElementById('test-progress-bar'),
+        testProgressText: document.getElementById('test-progress-text'),
+        testCounts: Object.fromEntries(
+            ['untested', ...Object.keys(DISPLAY_RESULT)].map(key => [key, document.getElementById(`test-count-${key}`)])
+        ),
         testFilterButtons: Array.from(document.querySelectorAll('[data-test-filter]'))
     };
     /** @type {AppState} */
@@ -150,7 +171,9 @@
         if (!data || typeof data !== 'object' || Array.isArray(data)) throw new Error('JSONの最上位がオブジェクトではありません。Cosenseのプロジェクトエクスポートを選択してください。');
         if (typeof data.name !== 'string' || data.name.trim() === '') throw new Error('プロジェクト名（name）が見つかりません。Cosenseの通常のエクスポート形式か確認してください。');
         if (!Array.isArray(data.pages)) throw new Error('pages配列が見つかりません。Cosenseの通常のエクスポート形式か確認してください。');
-        if (data.pages.some(page => !page || typeof page.title !== 'string' || !Array.isArray(page.lines))) throw new Error('titleまたはlinesを持たないページがあります。エクスポート形式を確認してください。');
+        if (
+            data.pages.some(page => !page || typeof page.title !== 'string' || !Array.isArray(page.lines))
+        ) throw new Error('titleまたはlinesを持たないページがあります。エクスポート形式を確認してください。');
         const invalidLine = data.pages.some(page => page.lines.some(line => typeof line !== 'string' && (!line || typeof line.text !== 'string')));
         if (invalidLine) throw new Error('文字列またはtextを持つオブジェクトではない行があります。エクスポート形式を確認してください。');
     }
@@ -183,7 +206,12 @@
                 if (idsOnLine.has(id)) continue;
                 idsOnLine.add(id);
                 if (!imageMap.has(id)) imageMap.set(id, { id, url: `https://gyazo.com/${id}`, sources: [] });
-                imageMap.get(id).sources.push({ pageTitle: page.title, lineText, lineNumber: lineIndex + 1, pageUrl: getCosensePageUrl(data.name, page.title) });
+                imageMap.get(id).sources.push({
+                    pageTitle: page.title,
+                    lineText,
+                    lineNumber: lineIndex + 1,
+                    pageUrl: getCosensePageUrl(data.name, page.title)
+                });
             }
         }));
         return Array.from(imageMap.values()).sort((a, b) => a.id.localeCompare(b.id));
@@ -193,7 +221,9 @@
      * @param {string} projectName
      * @returns {string}
      */
-    function getTestStorageKey(projectName) { return `${TEST_STORAGE_PREFIX}${encodeURIComponent(projectName)}`; }
+    function getTestStorageKey(projectName) {
+        return `${TEST_STORAGE_PREFIX}${encodeURIComponent(projectName)}`;
+    }
 
     /**
      * 現在のJSONに含まれる画像だけを対象に、保存済みの表示テスト結果を復元する。
@@ -228,8 +258,11 @@
                 if (value.format) minimal[image.id].format = value.format;
             }
         });
-        try { localStorage.setItem(getTestStorageKey(state.currentProject), JSON.stringify(minimal)); }
-        catch (error) { showMessage('表示テスト結果をブラウザに保存できませんでした。ブラウザの保存設定を確認してください。', 'warning'); }
+        try {
+            localStorage.setItem(getTestStorageKey(state.currentProject), JSON.stringify(minimal));
+        } catch (error) {
+            showMessage('表示テスト結果をブラウザに保存できませんでした。ブラウザの保存設定を確認してください。', 'warning');
+        }
     }
 
     /**
@@ -258,9 +291,13 @@
         const item = document.createElement('li');
         item.className = 'source-item';
         const link = document.createElement('a');
-        link.href = source.pageUrl; link.target = '_blank'; link.rel = 'noopener noreferrer'; link.textContent = source.pageTitle || '（無題のページ）';
+        link.href = source.pageUrl;
+        link.target = '_blank';
+        link.rel = 'noopener noreferrer';
+        link.textContent = source.pageTitle || '（無題のページ）';
         const line = document.createElement('span');
-        line.className = 'source-line small'; line.textContent = `${source.lineNumber}行目: ${source.lineText}`;
+        line.className = 'source-line small';
+        line.textContent = `${source.lineNumber}行目: ${source.lineText}`;
         item.append(link, line);
         return item;
     }
@@ -352,13 +389,31 @@
      * @returns {HTMLElement}
      */
     function createImageElement(image) {
-        const article = document.createElement('article'); article.className = 'image-item'; article.dataset.imageId = image.id;
+        const article = document.createElement('article');
+        article.className = 'image-item';
+        article.dataset.imageId = image.id;
         const details = document.createElement('div');
-        const idLabel = document.createElement('div'); idLabel.className = 'image-id'; idLabel.textContent = image.id; details.append(idLabel);
-        const heading = document.createElement('div'); heading.className = 'small fw-semibold mt-3'; heading.textContent = `掲載元 ${image.sources.length}件`; details.append(heading);
-        const list = document.createElement('ul'); list.className = 'source-list'; image.sources.forEach(source => list.append(createSourceElement(source))); details.append(list);
-        const actions = document.createElement('div'); actions.className = 'item-actions';
-        const open = document.createElement('a'); open.className = 'btn btn-outline-primary'; open.href = image.url; open.target = '_blank'; open.rel = 'noopener noreferrer'; open.textContent = 'Gyazoで開く'; actions.append(open);
+        const idLabel = document.createElement('div');
+        idLabel.className = 'image-id';
+        idLabel.textContent = image.id;
+        details.append(idLabel);
+        const heading = document.createElement('div');
+        heading.className = 'small fw-semibold mt-3';
+        heading.textContent = `掲載元 ${image.sources.length}件`;
+        details.append(heading);
+        const list = document.createElement('ul');
+        list.className = 'source-list';
+        image.sources.forEach(source => list.append(createSourceElement(source)));
+        details.append(list);
+        const actions = document.createElement('div');
+        actions.className = 'item-actions';
+        const open = document.createElement('a');
+        open.className = 'btn btn-outline-primary';
+        open.href = image.url;
+        open.target = '_blank';
+        open.rel = 'noopener noreferrer';
+        open.textContent = 'Gyazoで開く';
+        actions.append(open);
         actions.append(createDisplayTestElement(image));
         article.append(details, actions);
         return article;
@@ -378,7 +433,10 @@
             const imageResult = testResults[image.id]?.result || 'untested';
             if (testResultFilter !== 'all' && imageResult !== testResultFilter) return false;
             if (!normalizedQuery) return true;
-            return [image.id, ...image.sources.flatMap(source => [source.pageTitle, source.lineText])].join('\n').toLocaleLowerCase('ja').includes(normalizedQuery);
+            return [image.id, ...image.sources.flatMap(source => [source.pageTitle, source.lineText])]
+                .join('\n')
+                .toLocaleLowerCase('ja')
+                .includes(normalizedQuery);
         });
     }
 
@@ -424,10 +482,13 @@
     function renderList() {
         const view = getCurrentListView();
         state.currentPage = view.page;
-        const fragment = document.createDocumentFragment(); view.items.forEach(image => fragment.append(createImageElement(image)));
+        const fragment = document.createDocumentFragment();
+        view.items.forEach(image => fragment.append(createImageElement(image)));
         elements.imageList.replaceChildren(fragment);
         elements.emptyFilter.classList.toggle('d-none', view.filtered.length !== 0);
-        elements.visibleCount.textContent = view.filtered.length === 0 ? `0 / ${state.images.length}件` : `${view.start + 1}〜${view.start + view.items.length} / ${view.filtered.length}件`;
+        elements.visibleCount.textContent = view.filtered.length === 0
+            ? `0 / ${state.images.length}件`
+            : `${view.start + 1}〜${view.start + view.items.length} / ${view.filtered.length}件`;
         const hidePagination = view.filtered.length === 0 || elements.pageSize.value === 'all';
         elements.paginationControls.forEach(controls => {
             controls.container.classList.toggle('d-none', hidePagination);
@@ -446,7 +507,9 @@
             const result = state.displayTestResults[image.id];
             counts[result && DISPLAY_RESULT[result.result] ? result.result : 'untested'] += 1;
         });
-        Object.entries(counts).forEach(([key, value]) => { elements.testCounts[key].textContent = value; });
+        Object.entries(counts).forEach(([key, value]) => {
+            elements.testCounts[key].textContent = value;
+        });
     }
     function updateTestFilterButtons() {
         elements.testFilterButtons.forEach(button => {
@@ -643,7 +706,9 @@
         const run = state.batchRun;
         if (!run) return;
         run.stopped = true;
-        state.activeTestRequests.forEach(request => { if (request.runId === run.id) request.cancel(); });
+        state.activeTestRequests.forEach(request => {
+            if (request.runId === run.id) request.cancel();
+        });
         state.batchRun = null;
         setBatchControls(false);
         renderList();
@@ -680,9 +745,15 @@
             displayPreviewUrls: {},
             currentPage: 1
         });
-        elements.projectHeading.textContent = data.displayName || data.name; elements.search.value = ''; elements.testResultFilter.value = 'all'; elements.workspace.classList.remove('d-none');
+        elements.projectHeading.textContent = data.displayName || data.name;
+        elements.search.value = '';
+        elements.testResultFilter.value = 'all';
+        elements.workspace.classList.remove('d-none');
         elements.inputSummary.textContent = `${state.images.length}件のGyazo画像を読み込み済み`;
-        updateDisplayTestSummary(); renderList(); showMessage(`${state.images.length}件のGyazo画像を読み込みました。`, 'success'); setInputCompact(true);
+        updateDisplayTestSummary();
+        renderList();
+        showMessage(`${state.images.length}件のGyazo画像を読み込みました。`, 'success');
+        setInputCompact(true);
     }
 
     /**
@@ -691,39 +762,83 @@
      * @returns {Promise<void>}
      */
     async function handleFile(file) {
-        clearMessage(); elements.workspace.classList.add('d-none'); if (!file) return;
+        clearMessage();
+        elements.workspace.classList.add('d-none');
+        if (!file) return;
         setInputCompact(false);
         invalidateDisplayTests();
-        if (!file.name.toLowerCase().endsWith('.json') && file.type !== 'application/json') { showMessage('JSONファイルを選択してください。', 'danger'); return; }
+        if (!file.name.toLowerCase().endsWith('.json') && file.type !== 'application/json') {
+            showMessage('JSONファイルを選択してください。', 'danger');
+            return;
+        }
         try {
-            const text = await file.text(); let data;
-            try { data = JSON.parse(text); } catch (error) { throw new Error('JSONを解析できませんでした。ファイルが壊れていないか確認してください。'); }
+            const text = await file.text();
+            let data;
+            try {
+                data = JSON.parse(text);
+            } catch (error) {
+                throw new Error('JSONを解析できませんでした。ファイルが壊れていないか確認してください。');
+            }
             loadExport(data);
-        } catch (error) { showMessage(error instanceof Error ? error.message : 'ファイルの読み込みに失敗しました。', 'danger'); }
-        finally { elements.fileInput.value = ''; }
+        } catch (error) {
+            showMessage(error instanceof Error ? error.message : 'ファイルの読み込みに失敗しました。', 'danger');
+        } finally {
+            elements.fileInput.value = '';
+        }
     }
 
     /**
      * @param {unknown} value
      * @returns {string}
      */
-    function csvEscape(value) { return `"${String(value).replace(/"/g, '""')}"`; }
+    function csvEscape(value) {
+        return `"${String(value).replace(/"/g, '""')}"`;
+    }
 
     /** 表示テスト結果をExcelで開きやすいBOM付きUTF-8のCSVとして保存する。 */
     function exportCsv() {
         const rows = state.images.map(image => {
             const testResult = state.displayTestResults[image.id];
-            return [image.id, image.url, testResult ? DISPLAY_RESULT[testResult.result] : '未判定', testResult ? testResult.testedAt : '', Array.from(new Set(image.sources.map(source => source.pageTitle))).join(' / ')];
+            return [
+                image.id,
+                image.url,
+                testResult ? DISPLAY_RESULT[testResult.result] : '未判定',
+                testResult ? testResult.testedAt : '',
+                Array.from(new Set(image.sources.map(source => source.pageTitle))).join(' / ')
+            ];
         });
-        const csv = '\uFEFF' + [['画像ID', '確認用URL', '表示テスト結果', '検査日時', '掲載元ページ'], ...rows].map(row => row.map(csvEscape).join(',')).join('\r\n');
+        const csv = '\uFEFF' + [
+            ['画像ID', '確認用URL', '表示テスト結果', '検査日時', '掲載元ページ'],
+            ...rows
+        ].map(row => row.map(csvEscape).join(',')).join('\r\n');
         const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
-        const link = document.createElement('a'); link.href = url; link.download = `gyazo-review-${state.currentProject.replace(/[\\/:*?"<>|]/g, '_')}.csv`; document.body.append(link); link.click(); link.remove(); URL.revokeObjectURL(url);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `gyazo-review-${state.currentProject.replace(/[\\/:*?"<>|]/g, '_')}.csv`;
+        document.body.append(link);
+        link.click();
+        link.remove();
+        URL.revokeObjectURL(url);
     }
 
-    function resetPageAndRender() { state.currentPage = 1; renderList(); }
-    function moveToFirstPage() { state.currentPage = 1; renderList(); }
-    function moveToPreviousPage() { if (state.currentPage > 1) { state.currentPage -= 1; renderList(); } }
-    function moveToNextPage() { state.currentPage += 1; renderList(); }
+    function resetPageAndRender() {
+        state.currentPage = 1;
+        renderList();
+    }
+    function moveToFirstPage() {
+        state.currentPage = 1;
+        renderList();
+    }
+    function moveToPreviousPage() {
+        if (state.currentPage > 1) {
+            state.currentPage -= 1;
+            renderList();
+        }
+    }
+    function moveToNextPage() {
+        state.currentPage += 1;
+        renderList();
+    }
     function moveToLastPage() {
         state.currentPage = getCurrentListView().totalPages;
         renderList();
@@ -733,9 +848,20 @@
     function bindEvents() {
         elements.fileInput.addEventListener('change', event => handleFile(event.target.files[0]));
         elements.chooseAnotherFile.addEventListener('click', () => elements.fileInput.click());
-        elements.dropZone.addEventListener('keydown', event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); elements.fileInput.click(); } });
-        ['dragenter', 'dragover'].forEach(type => elements.dropZone.addEventListener(type, event => { event.preventDefault(); elements.dropZone.classList.add('is-dragging'); }));
-        ['dragleave', 'drop'].forEach(type => elements.dropZone.addEventListener(type, event => { event.preventDefault(); elements.dropZone.classList.remove('is-dragging'); }));
+        elements.dropZone.addEventListener('keydown', event => {
+            if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                elements.fileInput.click();
+            }
+        });
+        ['dragenter', 'dragover'].forEach(type => elements.dropZone.addEventListener(type, event => {
+            event.preventDefault();
+            elements.dropZone.classList.add('is-dragging');
+        }));
+        ['dragleave', 'drop'].forEach(type => elements.dropZone.addEventListener(type, event => {
+            event.preventDefault();
+            elements.dropZone.classList.remove('is-dragging');
+        }));
         elements.dropZone.addEventListener('drop', event => handleFile(event.dataTransfer.files[0]));
         elements.search.addEventListener('input', resetPageAndRender);
         elements.testResultFilter.addEventListener('change', resetPageAndRender);
@@ -756,6 +882,13 @@
         elements.exportCsv.addEventListener('click', exportCsv);
     }
 
-    window.CosenseGyazoReview = Object.freeze({ extractImages, validateExport, getCosensePageUrl, filterImages, paginateImages, csvEscape });
+    window.CosenseGyazoReview = Object.freeze({
+        extractImages,
+        validateExport,
+        getCosensePageUrl,
+        filterImages,
+        paginateImages,
+        csvEscape
+    });
     bindEvents();
 }());
