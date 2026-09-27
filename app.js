@@ -14,7 +14,10 @@
         projectHeading: document.getElementById('project-heading'), imageList: document.getElementById('image-list'),
         emptyFilter: document.getElementById('empty-filter'), search: document.getElementById('search'),
         statusFilter: document.getElementById('status-filter'), pageSize: document.getElementById('page-size'),
-        pagination: document.getElementById('pagination'), firstPage: document.getElementById('first-page'),
+        topPagination: document.getElementById('top-pagination'), topFirstPage: document.getElementById('top-first-page'),
+        topPreviousPage: document.getElementById('top-previous-page'), topNextPage: document.getElementById('top-next-page'),
+        topLastPage: document.getElementById('top-last-page'), topPageInfo: document.getElementById('top-page-info'),
+        bottomPagination: document.getElementById('bottom-pagination'), firstPage: document.getElementById('first-page'),
         previousPage: document.getElementById('previous-page'), nextPage: document.getElementById('next-page'),
         lastPage: document.getElementById('last-page'), pageInfo: document.getElementById('page-info'), openNext: document.getElementById('open-next'),
         exportCsv: document.getElementById('export-csv'), visibleCount: document.getElementById('visible-count'),
@@ -226,12 +229,11 @@
         elements.imageList.replaceChildren(fragment);
         elements.emptyFilter.classList.toggle('d-none', filtered.length !== 0);
         elements.visibleCount.textContent = filtered.length === 0 ? `0 / ${images.length}件` : `${start + 1}〜${start + visible.length} / ${filtered.length}件`;
-        elements.pagination.classList.toggle('d-none', filtered.length === 0 || elements.pageSize.value === 'all');
-        elements.pageInfo.textContent = `${currentPage} / ${totalPages}ページ`;
-        elements.firstPage.disabled = currentPage === 1;
-        elements.previousPage.disabled = currentPage === 1;
-        elements.nextPage.disabled = currentPage === totalPages;
-        elements.lastPage.disabled = currentPage === totalPages;
+        const hidePagination = filtered.length === 0 || elements.pageSize.value === 'all';
+        [elements.topPagination, elements.bottomPagination].forEach(pagination => pagination.classList.toggle('d-none', hidePagination));
+        [elements.topPageInfo, elements.pageInfo].forEach(info => { info.textContent = `${currentPage} / ${totalPages}ページ`; });
+        [elements.topFirstPage, elements.firstPage, elements.topPreviousPage, elements.previousPage].forEach(button => { button.disabled = currentPage === 1; });
+        [elements.topNextPage, elements.nextPage, elements.topLastPage, elements.lastPage].forEach(button => { button.disabled = currentPage === totalPages; });
         updateTestScopeButton();
     }
     function updateSummary() {
@@ -425,15 +427,19 @@
     elements.testScope.addEventListener('change', updateTestScopeButton);
     elements.startDisplayTest.addEventListener('click', startBatchDisplayTest);
     elements.stopDisplayTest.addEventListener('click', stopBatchDisplayTest);
-    elements.firstPage.addEventListener('click', () => { currentPage = 1; renderList(); });
-    elements.previousPage.addEventListener('click', () => { if (currentPage > 1) { currentPage -= 1; renderList(); } });
-    elements.nextPage.addEventListener('click', () => { currentPage += 1; renderList(); });
-    elements.lastPage.addEventListener('click', () => {
+    function moveToFirstPage() { currentPage = 1; renderList(); }
+    function moveToPreviousPage() { if (currentPage > 1) { currentPage -= 1; renderList(); } }
+    function moveToNextPage() { currentPage += 1; renderList(); }
+    function moveToLastPage() {
         const filteredCount = getFilteredImages().length;
         const pageSize = elements.pageSize.value === 'all' ? Math.max(filteredCount, 1) : Number(elements.pageSize.value);
         currentPage = Math.max(Math.ceil(filteredCount / pageSize), 1);
         renderList();
-    });
+    }
+    [elements.topFirstPage, elements.firstPage].forEach(button => button.addEventListener('click', moveToFirstPage));
+    [elements.topPreviousPage, elements.previousPage].forEach(button => button.addEventListener('click', moveToPreviousPage));
+    [elements.topNextPage, elements.nextPage].forEach(button => button.addEventListener('click', moveToNextPage));
+    [elements.topLastPage, elements.lastPage].forEach(button => button.addEventListener('click', moveToLastPage));
     elements.openNext.addEventListener('click', () => { const next = images.find(image => getStatus(image.id) === 'unchecked'); if (next) window.open(next.url, '_blank', 'noopener,noreferrer'); });
     elements.exportCsv.addEventListener('click', exportCsv);
     window.CosenseGyazoReview = Object.freeze({ extractImages, validateExport, getCosensePageUrl, csvEscape });
