@@ -31,10 +31,14 @@
     </header>
     <main class="flex-fill container-xl my-4">
         <section class="card shadow-sm mb-4" aria-labelledby="input-heading">
-            <div class="card-body p-4"><div class="row align-items-center g-4">
+            <div id="input-expanded" class="card-body p-4"><div class="row align-items-center g-4">
                 <div class="col-lg-7"><h1 id="input-heading" class="h3 mb-2">エクスポートJSONを読み込む</h1><p class="text-secondary mb-0">ファイルはこのブラウザ内だけで解析します。JSON本文やページ内容を外部へ送信・保存しません。</p></div>
                 <div class="col-lg-5"><label id="drop-zone" class="drop-zone" for="file-input" tabindex="0"><span class="drop-zone-title">ここにJSONをドロップ</span><span class="small text-secondary">またはクリックしてファイルを選択</span><input id="file-input" type="file" accept=".json,application/json" hidden></label></div>
             </div><div id="message" class="alert mt-3 mb-0 d-none" role="alert" aria-live="polite"></div></div>
+            <div id="input-compact" class="card-body input-compact d-none">
+                <span id="input-summary" class="text-secondary"></span>
+                <button id="choose-another-file" type="button" class="btn btn-outline-secondary">別のJSONを読み込む</button>
+            </div>
         </section>
         <section id="workspace" class="d-none" aria-labelledby="project-heading">
             <div class="card shadow-sm mb-4">

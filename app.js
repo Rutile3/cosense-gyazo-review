@@ -8,6 +8,8 @@
     const GYAZO_PATTERN = /https?:\/\/(?:i\.)?gyazo\.com\/([a-f0-9]{32})(?![a-f0-9])(?:\.[a-z0-9]+)?(?:[?#][^\s\]\[<>"']*)?/gi;
     const elements = {
         fileInput: document.getElementById('file-input'), dropZone: document.getElementById('drop-zone'),
+        inputExpanded: document.getElementById('input-expanded'), inputCompact: document.getElementById('input-compact'),
+        inputSummary: document.getElementById('input-summary'), chooseAnotherFile: document.getElementById('choose-another-file'),
         message: document.getElementById('message'), workspace: document.getElementById('workspace'),
         projectHeading: document.getElementById('project-heading'), imageList: document.getElementById('image-list'),
         emptyFilter: document.getElementById('empty-filter'), search: document.getElementById('search'),
@@ -43,6 +45,10 @@
     function clearMessage() {
         elements.message.textContent = '';
         elements.message.className = 'alert mt-3 mb-0 d-none';
+    }
+    function setInputCompact(compact) {
+        elements.inputExpanded.classList.toggle('d-none', compact);
+        elements.inputCompact.classList.toggle('d-none', !compact);
     }
     function validateExport(data) {
         if (!data || typeof data !== 'object' || Array.isArray(data)) throw new Error('JSONの最上位がオブジェクトではありません。Cosenseのプロジェクトエクスポートを選択してください。');
@@ -385,10 +391,12 @@
         displayTestResults = loadDisplayTestResults(currentProject, new Set(images.map(image => image.id)));
         displayPreviewUrls = {};
         currentPage = 1; elements.projectHeading.textContent = data.displayName || data.name; elements.search.value = ''; elements.testResultFilter.value = 'all'; elements.workspace.classList.remove('d-none');
-        updateDisplayTestSummary(); renderList(); showMessage(`${images.length}件のGyazo画像を読み込みました。`, 'success');
+        elements.inputSummary.textContent = `${images.length}件のGyazo画像を読み込み済み`;
+        updateDisplayTestSummary(); renderList(); showMessage(`${images.length}件のGyazo画像を読み込みました。`, 'success'); setInputCompact(true);
     }
     async function handleFile(file) {
         clearMessage(); elements.workspace.classList.add('d-none'); if (!file) return;
+        setInputCompact(false);
         invalidateDisplayTests();
         if (!file.name.toLowerCase().endsWith('.json') && file.type !== 'application/json') { showMessage('JSONファイルを選択してください。', 'danger'); return; }
         try {
@@ -409,6 +417,7 @@
         const link = document.createElement('a'); link.href = url; link.download = `gyazo-review-${currentProject.replace(/[\\/:*?"<>|]/g, '_')}.csv`; document.body.append(link); link.click(); link.remove(); URL.revokeObjectURL(url);
     }
     elements.fileInput.addEventListener('change', event => handleFile(event.target.files[0]));
+    elements.chooseAnotherFile.addEventListener('click', () => elements.fileInput.click());
     elements.dropZone.addEventListener('keydown', event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); elements.fileInput.click(); } });
     ['dragenter', 'dragover'].forEach(type => elements.dropZone.addEventListener(type, event => { event.preventDefault(); elements.dropZone.classList.add('is-dragging'); }));
     ['dragleave', 'drop'].forEach(type => elements.dropZone.addEventListener(type, event => { event.preventDefault(); elements.dropZone.classList.remove('is-dragging'); }));
