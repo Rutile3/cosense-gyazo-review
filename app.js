@@ -26,6 +26,32 @@
      * @property {DisplayTestFormat} [format] 表示できた形式
      */
 
+    /**
+     * @typedef {Object} BatchRun
+     * @property {number} id
+     * @property {GyazoImage[]} targets
+     * @property {number} total
+     * @property {number} nextIndex
+     * @property {number} completed
+     * @property {boolean} stopped
+     * @property {{available: number, unavailable: number, timeout: number}} counts
+     */
+
+    /**
+     * @typedef {Object} AppState
+     * @property {string|null} currentProject
+     * @property {GyazoImage[]} images
+     * @property {Record<string, DisplayTestResult>} displayTestResults
+     * @property {Record<string, string>} displayPreviewUrls
+     * @property {number} currentPage
+     * @property {number} sessionVersion
+     * @property {number} requestSequence
+     * @property {number} batchSequence
+     * @property {BatchRun|null} batchRun
+     * @property {Map<string, {requestId: number, runId: number|null, cancel: Function}>} activeTestRequests
+     * @property {Set<string>} testingImageIds
+     */
+
     // 表示テストはHTTPステータスではなく、ブラウザのメディア読込イベントで判定する。
     const DISPLAY_RESULT = Object.freeze({ available: '表示できた', unavailable: '表示できない', timeout: '時間切れ' });
     /** @type {ReadonlyArray<DisplayTestFormat>} */
@@ -57,19 +83,22 @@
         testCounts: Object.fromEntries(['untested', ...Object.keys(DISPLAY_RESULT)].map(key => [key, document.getElementById(`test-count-${key}`)])),
         testFilterButtons: Array.from(document.querySelectorAll('[data-test-filter]'))
     };
-    let currentProject = null;
-    let images = [];
-    let displayTestResults = {};
-    // プレビューURLは現在のセッションだけで使い、localStorageには保存しない。
-    let displayPreviewUrls = {};
-    let currentPage = 1;
-    // JSON切り替え時に加算し、古い非同期リクエストの結果を破棄する。
-    let sessionVersion = 0;
-    let requestSequence = 0;
-    let batchSequence = 0;
-    let batchRun = null;
-    const activeTestRequests = new Map();
-    const testingImageIds = new Set();
+    /** @type {AppState} */
+    const state = {
+        currentProject: null,
+        images: [],
+        displayTestResults: {},
+        // プレビューURLは現在のセッションだけで使い、localStorageには保存しない。
+        displayPreviewUrls: {},
+        currentPage: 1,
+        // JSON切り替え時に加算し、古い非同期リクエストの結果を破棄する。
+        sessionVersion: 0,
+        requestSequence: 0,
+        batchSequence: 0,
+        batchRun: null,
+        activeTestRequests: new Map(),
+        testingImageIds: new Set()
+    };
 
     function showMessage(text, type) {
         elements.message.textContent = text;
@@ -164,14 +193,14 @@
      */
     function saveDisplayTestResults() {
         const minimal = {};
-        images.forEach(image => {
-            const value = displayTestResults[image.id];
+        state.images.forEach(image => {
+            const value = state.displayTestResults[image.id];
             if (value && DISPLAY_RESULT[value.result]) {
                 minimal[image.id] = { result: value.result, testedAt: value.testedAt };
                 if (value.format) minimal[image.id].format = value.format;
             }
         });
-        try { localStorage.setItem(getTestStorageKey(currentProject), JSON.stringify(minimal)); }
+        try { localStorage.setItem(getTestStorageKey(state.currentProject), JSON.stringify(minimal)); }
         catch (error) { showMessage('表示テスト結果をブラウザに保存できませんでした。ブラウザの保存設定を確認してください。', 'warning'); }
     }
 
@@ -185,7 +214,7 @@
      */
     function getDisplayImageUrl(id, format, cacheBust) {
         const base = `https://i.gyazo.com/${id}.${format}`;
-        return cacheBust ? `${base}?cosense_gyazo_review=${Date.now()}-${requestSequence}` : base;
+        return cacheBust ? `${base}?cosense_gyazo_review=${Date.now()}-${state.requestSequence}` : base;
     }
     function formatTestedAt(value) {
         const date = new Date(value);
@@ -215,8 +244,8 @@
      */
     function createDisplayTestElement(image) {
         const container = document.createElement('div');
-        const result = displayTestResults[image.id];
-        const isTesting = testingImageIds.has(image.id);
+        const result = state.displayTestResults[image.id];
+        const isTesting = state.testingImageIds.has(image.id);
         const resultBox = document.createElement('div');
         resultBox.className = 'display-test-result small';
         resultBox.dataset.result = isTesting ? 'testing' : (result ? result.result : 'untested');
@@ -233,7 +262,7 @@
         if (result && result.result === 'available') {
             const preview = document.createElement(result.format === 'mp4' ? 'video' : 'img');
             preview.className = 'image-preview';
-            preview.src = displayPreviewUrls[image.id] || getDisplayImageUrl(image.id, result.format || 'png', false);
+            preview.src = state.displayPreviewUrls[image.id] || getDisplayImageUrl(image.id, result.format || 'png', false);
             if (result.format === 'mp4') {
                 preview.controls = true;
                 preview.muted = true;
@@ -250,8 +279,8 @@
         const button = document.createElement('button');
         button.type = 'button';
         button.className = 'btn btn-outline-secondary mt-2';
-        button.disabled = isTesting || Boolean(batchRun);
-        button.textContent = isTesting ? 'テスト中…' : (batchRun ? '一括テスト中' : (result ? '再テスト' : '表示をテスト'));
+        button.disabled = isTesting || Boolean(state.batchRun);
+        button.textContent = isTesting ? 'テスト中…' : (state.batchRun ? '一括テスト中' : (result ? '再テスト' : '表示をテスト'));
         button.addEventListener('click', () => runSingleDisplayTest(image));
         container.append(resultBox, button);
         return container;
@@ -282,8 +311,8 @@
     function getFilteredImages() {
         const query = elements.search.value.trim().toLocaleLowerCase('ja');
         const testResult = elements.testResultFilter.value;
-        return images.filter(image => {
-            const imageResult = displayTestResults[image.id]?.result || 'untested';
+        return state.images.filter(image => {
+            const imageResult = state.displayTestResults[image.id]?.result || 'untested';
             if (testResult !== 'all' && imageResult !== testResult) return false;
             if (!query) return true;
             return [image.id, ...image.sources.flatMap(source => [source.pageTitle, source.lineText])].join('\n').toLocaleLowerCase('ja').includes(query);
@@ -299,7 +328,7 @@
         const filtered = filteredImages || getFilteredImages();
         const pageSize = elements.pageSize.value === 'all' ? Math.max(filtered.length, 1) : Number(elements.pageSize.value);
         const totalPages = Math.max(Math.ceil(filtered.length / pageSize), 1);
-        const page = Math.min(currentPage, totalPages);
+        const page = Math.min(state.currentPage, totalPages);
         const start = (page - 1) * pageSize;
         return filtered.slice(start, start + pageSize);
     }
@@ -309,12 +338,12 @@
      * @returns {GyazoImage[]}
      */
     function getBatchTargets() {
-        if (elements.testScope.value === 'all') return images.slice();
+        if (elements.testScope.value === 'all') return state.images.slice();
         const filtered = getFilteredImages();
         return elements.testScope.value === 'filtered' ? filtered : getVisibleImages(filtered);
     }
     function updateTestScopeButton() {
-        if (batchRun) return;
+        if (state.batchRun) return;
         const count = getBatchTargets().length;
         elements.startDisplayTest.textContent = `対象${count}件を順次テスト`;
         elements.startDisplayTest.disabled = count === 0;
@@ -325,25 +354,25 @@
         const filtered = getFilteredImages();
         const pageSize = elements.pageSize.value === 'all' ? Math.max(filtered.length, 1) : Number(elements.pageSize.value);
         const totalPages = Math.max(Math.ceil(filtered.length / pageSize), 1);
-        currentPage = Math.min(currentPage, totalPages);
-        const start = (currentPage - 1) * pageSize;
+        state.currentPage = Math.min(state.currentPage, totalPages);
+        const start = (state.currentPage - 1) * pageSize;
         const visible = getVisibleImages(filtered);
         const fragment = document.createDocumentFragment(); visible.forEach(image => fragment.append(createImageElement(image)));
         elements.imageList.replaceChildren(fragment);
         elements.emptyFilter.classList.toggle('d-none', filtered.length !== 0);
-        elements.visibleCount.textContent = filtered.length === 0 ? `0 / ${images.length}件` : `${start + 1}〜${start + visible.length} / ${filtered.length}件`;
+        elements.visibleCount.textContent = filtered.length === 0 ? `0 / ${state.images.length}件` : `${start + 1}〜${start + visible.length} / ${filtered.length}件`;
         const hidePagination = filtered.length === 0 || elements.pageSize.value === 'all';
         [elements.topPagination, elements.bottomPagination].forEach(pagination => pagination.classList.toggle('d-none', hidePagination));
-        [elements.topPageInfo, elements.pageInfo].forEach(info => { info.textContent = `${currentPage} / ${totalPages}ページ`; });
-        [elements.topFirstPage, elements.firstPage, elements.topPreviousPage, elements.previousPage].forEach(button => { button.disabled = currentPage === 1; });
-        [elements.topNextPage, elements.nextPage, elements.topLastPage, elements.lastPage].forEach(button => { button.disabled = currentPage === totalPages; });
+        [elements.topPageInfo, elements.pageInfo].forEach(info => { info.textContent = `${state.currentPage} / ${totalPages}ページ`; });
+        [elements.topFirstPage, elements.firstPage, elements.topPreviousPage, elements.previousPage].forEach(button => { button.disabled = state.currentPage === 1; });
+        [elements.topNextPage, elements.nextPage, elements.topLastPage, elements.lastPage].forEach(button => { button.disabled = state.currentPage === totalPages; });
         updateTestFilterButtons();
         updateTestScopeButton();
     }
     function updateDisplayTestSummary() {
         const counts = { untested: 0, available: 0, unavailable: 0, timeout: 0 };
-        images.forEach(image => {
-            const result = displayTestResults[image.id];
+        state.images.forEach(image => {
+            const result = state.displayTestResults[image.id];
             counts[result && DISPLAY_RESULT[result.result] ? result.result : 'untested'] += 1;
         });
         Object.entries(counts).forEach(([key, value]) => { elements.testCounts[key].textContent = value; });
@@ -369,11 +398,11 @@
      * @returns {Promise<'available'|'unavailable'|'timeout'|'cancelled'>}
      */
     function performDisplayTest(image, runId) {
-        const previous = activeTestRequests.get(image.id);
+        const previous = state.activeTestRequests.get(image.id);
         if (previous) previous.cancel();
-        const requestId = ++requestSequence;
-        const requestSession = sessionVersion;
-        testingImageIds.add(image.id);
+        const requestId = ++state.requestSequence;
+        const requestSession = state.sessionVersion;
+        state.testingImageIds.add(image.id);
         refreshDisplayTestUi(image.id);
 
         return new Promise(resolve => {
@@ -399,17 +428,17 @@
                         }
                     }
                 });
-                const active = activeTestRequests.get(image.id);
+                const active = state.activeTestRequests.get(image.id);
                 if (active && active.requestId === requestId) {
-                    activeTestRequests.delete(image.id);
-                    testingImageIds.delete(image.id);
+                    state.activeTestRequests.delete(image.id);
+                    state.testingImageIds.delete(image.id);
                 }
-                const isCurrent = requestSession === sessionVersion && images.some(item => item.id === image.id);
+                const isCurrent = requestSession === state.sessionVersion && state.images.some(item => item.id === image.id);
                 if (shouldSave && isCurrent) {
-                    displayTestResults[image.id] = { result: outcome, testedAt: new Date().toISOString() };
-                    if (format) displayTestResults[image.id].format = format;
-                    if (outcome === 'available') displayPreviewUrls[image.id] = testUrls[format];
-                    else delete displayPreviewUrls[image.id];
+                    state.displayTestResults[image.id] = { result: outcome, testedAt: new Date().toISOString() };
+                    if (format) state.displayTestResults[image.id].format = format;
+                    if (outcome === 'available') state.displayPreviewUrls[image.id] = testUrls[format];
+                    else delete state.displayPreviewUrls[image.id];
                     saveDisplayTestResults();
                 }
                 if (isCurrent) refreshDisplayTestUi(image.id);
@@ -418,7 +447,7 @@
             const cancel = () => {
                 finish('cancelled', null, false);
             };
-            activeTestRequests.set(image.id, { requestId, runId, cancel });
+            state.activeTestRequests.set(image.id, { requestId, runId, cancel });
             DISPLAY_FORMATS.forEach(format => {
                 const isVideo = format === 'mp4';
                 const loader = isVideo ? document.createElement('video') : new Image();
@@ -458,11 +487,11 @@
 
     /** 同時実行数を制限したワーカーで、選択範囲を順番に表示テストする。 */
     async function startBatchDisplayTest() {
-        if (batchRun) return;
+        if (state.batchRun) return;
         const targets = getBatchTargets();
         if (targets.length === 0) return;
         const run = {
-            id: ++batchSequence,
+            id: ++state.batchSequence,
             targets,
             total: targets.length,
             nextIndex: 0,
@@ -470,7 +499,7 @@
             stopped: false,
             counts: { available: 0, unavailable: 0, timeout: 0 }
         };
-        batchRun = run;
+        state.batchRun = run;
         elements.testProgress.classList.remove('d-none');
         setBatchControls(true);
         renderList();
@@ -489,18 +518,18 @@
             }
         };
         await Promise.all(Array.from({ length: Math.min(TEST_CONCURRENCY, run.total) }, () => worker()));
-        if (batchRun !== run) return;
-        batchRun = null;
+        if (state.batchRun !== run) return;
+        state.batchRun = null;
         setBatchControls(false);
         renderList();
         elements.testProgressText.textContent = `完了: ${run.completed} / ${run.total}件（表示できた ${run.counts.available}、表示できない ${run.counts.unavailable}、時間切れ ${run.counts.timeout}）`;
     }
     function stopBatchDisplayTest() {
-        const run = batchRun;
+        const run = state.batchRun;
         if (!run) return;
         run.stopped = true;
-        activeTestRequests.forEach(request => { if (request.runId === run.id) request.cancel(); });
-        batchRun = null;
+        state.activeTestRequests.forEach(request => { if (request.runId === run.id) request.cancel(); });
+        state.batchRun = null;
         setBatchControls(false);
         renderList();
         elements.testProgressText.textContent = `停止しました: ${run.completed} / ${run.total}件を完了`;
@@ -511,12 +540,12 @@
      * JSONの切り替え前に必ず呼び出す。
      */
     function invalidateDisplayTests() {
-        sessionVersion += 1;
-        if (batchRun) batchRun.stopped = true;
-        activeTestRequests.forEach(request => request.cancel());
-        activeTestRequests.clear();
-        testingImageIds.clear();
-        batchRun = null;
+        state.sessionVersion += 1;
+        if (state.batchRun) state.batchRun.stopped = true;
+        state.activeTestRequests.forEach(request => request.cancel());
+        state.activeTestRequests.clear();
+        state.testingImageIds.clear();
+        state.batchRun = null;
         elements.testProgress.classList.add('d-none');
         setBatchControls(false);
     }
@@ -529,12 +558,16 @@
         validateExport(data);
         const extracted = extractImages(data);
         if (extracted.length === 0) throw new Error('有効なGyazo画像URLが見つかりませんでした。32桁の画像IDを含むURLがあるか確認してください。');
-        currentProject = data.name; images = extracted;
-        displayTestResults = loadDisplayTestResults(currentProject, new Set(images.map(image => image.id)));
-        displayPreviewUrls = {};
-        currentPage = 1; elements.projectHeading.textContent = data.displayName || data.name; elements.search.value = ''; elements.testResultFilter.value = 'all'; elements.workspace.classList.remove('d-none');
-        elements.inputSummary.textContent = `${images.length}件のGyazo画像を読み込み済み`;
-        updateDisplayTestSummary(); renderList(); showMessage(`${images.length}件のGyazo画像を読み込みました。`, 'success'); setInputCompact(true);
+        Object.assign(state, {
+            currentProject: data.name,
+            images: extracted,
+            displayTestResults: loadDisplayTestResults(data.name, new Set(extracted.map(image => image.id))),
+            displayPreviewUrls: {},
+            currentPage: 1
+        });
+        elements.projectHeading.textContent = data.displayName || data.name; elements.search.value = ''; elements.testResultFilter.value = 'all'; elements.workspace.classList.remove('d-none');
+        elements.inputSummary.textContent = `${state.images.length}件のGyazo画像を読み込み済み`;
+        updateDisplayTestSummary(); renderList(); showMessage(`${state.images.length}件のGyazo画像を読み込みました。`, 'success'); setInputCompact(true);
     }
 
     /**
@@ -563,13 +596,13 @@
 
     /** 表示テスト結果をExcelで開きやすいBOM付きUTF-8のCSVとして保存する。 */
     function exportCsv() {
-        const rows = images.map(image => {
-            const testResult = displayTestResults[image.id];
+        const rows = state.images.map(image => {
+            const testResult = state.displayTestResults[image.id];
             return [image.id, image.url, testResult ? DISPLAY_RESULT[testResult.result] : '未判定', testResult ? testResult.testedAt : '', Array.from(new Set(image.sources.map(source => source.pageTitle))).join(' / ')];
         });
         const csv = '\uFEFF' + [['画像ID', '確認用URL', '表示テスト結果', '検査日時', '掲載元ページ'], ...rows].map(row => row.map(csvEscape).join(',')).join('\r\n');
         const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
-        const link = document.createElement('a'); link.href = url; link.download = `gyazo-review-${currentProject.replace(/[\\/:*?"<>|]/g, '_')}.csv`; document.body.append(link); link.click(); link.remove(); URL.revokeObjectURL(url);
+        const link = document.createElement('a'); link.href = url; link.download = `gyazo-review-${state.currentProject.replace(/[\\/:*?"<>|]/g, '_')}.csv`; document.body.append(link); link.click(); link.remove(); URL.revokeObjectURL(url);
     }
     elements.fileInput.addEventListener('change', event => handleFile(event.target.files[0]));
     elements.chooseAnotherFile.addEventListener('click', () => elements.fileInput.click());
@@ -577,7 +610,7 @@
     ['dragenter', 'dragover'].forEach(type => elements.dropZone.addEventListener(type, event => { event.preventDefault(); elements.dropZone.classList.add('is-dragging'); }));
     ['dragleave', 'drop'].forEach(type => elements.dropZone.addEventListener(type, event => { event.preventDefault(); elements.dropZone.classList.remove('is-dragging'); }));
     elements.dropZone.addEventListener('drop', event => handleFile(event.dataTransfer.files[0]));
-    function resetPageAndRender() { currentPage = 1; renderList(); }
+    function resetPageAndRender() { state.currentPage = 1; renderList(); }
     elements.search.addEventListener('input', resetPageAndRender);
     elements.testResultFilter.addEventListener('change', resetPageAndRender);
     elements.testFilterButtons.forEach(button => button.addEventListener('click', () => {
@@ -588,13 +621,13 @@
     elements.testScope.addEventListener('change', updateTestScopeButton);
     elements.startDisplayTest.addEventListener('click', startBatchDisplayTest);
     elements.stopDisplayTest.addEventListener('click', stopBatchDisplayTest);
-    function moveToFirstPage() { currentPage = 1; renderList(); }
-    function moveToPreviousPage() { if (currentPage > 1) { currentPage -= 1; renderList(); } }
-    function moveToNextPage() { currentPage += 1; renderList(); }
+    function moveToFirstPage() { state.currentPage = 1; renderList(); }
+    function moveToPreviousPage() { if (state.currentPage > 1) { state.currentPage -= 1; renderList(); } }
+    function moveToNextPage() { state.currentPage += 1; renderList(); }
     function moveToLastPage() {
         const filteredCount = getFilteredImages().length;
         const pageSize = elements.pageSize.value === 'all' ? Math.max(filteredCount, 1) : Number(elements.pageSize.value);
-        currentPage = Math.max(Math.ceil(filteredCount / pageSize), 1);
+        state.currentPage = Math.max(Math.ceil(filteredCount / pageSize), 1);
         renderList();
     }
     [elements.topFirstPage, elements.firstPage].forEach(button => button.addEventListener('click', moveToFirstPage));
