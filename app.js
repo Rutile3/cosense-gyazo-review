@@ -27,6 +27,13 @@
      */
 
     /**
+     * @typedef {Object} MediaTestOutcome
+     * @property {'available'|'unavailable'|'timeout'|'cancelled'} result
+     * @property {DisplayTestFormat} [format]
+     * @property {string} [previewUrl]
+     */
+
+    /**
      * @typedef {Object} BatchRun
      * @property {number} id
      * @property {GyazoImage[]} targets
@@ -217,12 +224,12 @@
      * 再テスト時はキャッシュ回避用クエリを付けるが、画像ID自体は変更しない。
      * @param {string} id
      * @param {DisplayTestFormat} format
-     * @param {boolean} cacheBust
+     * @param {number|null} cacheBustToken nullの場合は検査用クエリを付けない
      * @returns {string}
      */
-    function getDisplayImageUrl(id, format, cacheBust) {
+    function getDisplayImageUrl(id, format, cacheBustToken) {
         const base = `https://i.gyazo.com/${id}.${format}`;
-        return cacheBust ? `${base}?cosense_gyazo_review=${Date.now()}-${state.requestSequence}` : base;
+        return cacheBustToken === null ? base : `${base}?cosense_gyazo_review=${Date.now()}-${cacheBustToken}`;
     }
     function formatTestedAt(value) {
         const date = new Date(value);
@@ -270,7 +277,7 @@
         if (result && result.result === 'available') {
             const preview = document.createElement(result.format === 'mp4' ? 'video' : 'img');
             preview.className = 'image-preview';
-            preview.src = state.displayPreviewUrls[image.id] || getDisplayImageUrl(image.id, result.format || 'png', false);
+            preview.src = state.displayPreviewUrls[image.id] || getDisplayImageUrl(image.id, result.format || 'png', null);
             if (result.format === 'mp4') {
                 preview.controls = true;
                 preview.muted = true;
@@ -403,27 +410,21 @@
     }
 
     /**
-     * PNG・JPG・GIF・MP4を並行して読み込み、最初に表示できた形式を採用する。
-     * セッション番号を照合し、JSON切り替え前の結果が新しい一覧へ混入するのを防ぐ。
-     * @param {GyazoImage} image
-     * @param {number|null} runId 一括テストの識別子。個別テストの場合はnull
-     * @returns {Promise<'available'|'unavailable'|'timeout'|'cancelled'>}
+     * PNG・JPG・GIF・MP4を並行して読み込み、ブラウザのイベントだけで表示可否を判定する。
+     * 状態の保存や画面更新は行わず、判定結果とキャンセル関数を返す。
+     * @param {string} imageId
+     * @returns {{requestId: number, promise: Promise<MediaTestOutcome>, cancel: Function}}
      */
-    function performDisplayTest(image, runId) {
-        const previous = state.activeTestRequests.get(image.id);
-        if (previous) previous.cancel();
+    function createMediaTest(imageId) {
         const requestId = ++state.requestSequence;
-        const requestSession = state.sessionVersion;
-        state.testingImageIds.add(image.id);
-        refreshDisplayTestUi(image.id);
-
-        return new Promise(resolve => {
-            const loaders = [];
-            const testUrls = Object.fromEntries(DISPLAY_FORMATS.map(format => [format, getDisplayImageUrl(image.id, format, true)]));
+        const loaders = [];
+        const testUrls = Object.fromEntries(DISPLAY_FORMATS.map(format => [format, getDisplayImageUrl(imageId, format, requestId)]));
+        let cancel = () => {};
+        const promise = new Promise(resolve => {
             let errorCount = 0;
             let settled = false;
             let timer;
-            const finish = (outcome, format, shouldSave) => {
+            const finish = (result, format) => {
                 if (settled) return;
                 settled = true;
                 clearTimeout(timer);
@@ -431,7 +432,7 @@
                     element.onload = null;
                     element.onerror = null;
                     element.onloadedmetadata = null;
-                    if (outcome === 'available' || outcome === 'cancelled' || outcome === 'timeout') {
+                    if (result === 'available' || result === 'cancelled' || result === 'timeout') {
                         if (isVideo) {
                             element.removeAttribute('src');
                             element.load();
@@ -440,26 +441,15 @@
                         }
                     }
                 });
-                const active = state.activeTestRequests.get(image.id);
-                if (active && active.requestId === requestId) {
-                    state.activeTestRequests.delete(image.id);
-                    state.testingImageIds.delete(image.id);
+                /** @type {MediaTestOutcome} */
+                const outcome = { result };
+                if (format) {
+                    outcome.format = format;
+                    outcome.previewUrl = testUrls[format];
                 }
-                const isCurrent = requestSession === state.sessionVersion && state.images.some(item => item.id === image.id);
-                if (shouldSave && isCurrent) {
-                    state.displayTestResults[image.id] = { result: outcome, testedAt: new Date().toISOString() };
-                    if (format) state.displayTestResults[image.id].format = format;
-                    if (outcome === 'available') state.displayPreviewUrls[image.id] = testUrls[format];
-                    else delete state.displayPreviewUrls[image.id];
-                    saveDisplayTestResults();
-                }
-                if (isCurrent) refreshDisplayTestUi(image.id);
                 resolve(outcome);
             };
-            const cancel = () => {
-                finish('cancelled', null, false);
-            };
-            state.activeTestRequests.set(image.id, { requestId, runId, cancel });
+            cancel = () => finish('cancelled');
             DISPLAY_FORMATS.forEach(format => {
                 const isVideo = format === 'mp4';
                 const loader = isVideo ? document.createElement('video') : new Image();
@@ -468,18 +458,79 @@
                     loader.preload = 'metadata';
                     loader.muted = true;
                     loader.playsInline = true;
-                    loader.onloadedmetadata = () => finish('available', format, true);
+                    loader.onloadedmetadata = () => finish('available', format);
                 } else {
-                    loader.onload = () => finish('available', format, true);
+                    loader.onload = () => finish('available', format);
                 }
                 loader.onerror = () => {
                     errorCount += 1;
-                    if (errorCount === DISPLAY_FORMATS.length) finish('unavailable', null, true);
+                    if (errorCount === DISPLAY_FORMATS.length) finish('unavailable');
                 };
                 loader.src = testUrls[format];
             });
-            timer = setTimeout(() => finish('timeout', null, true), TEST_TIMEOUT_MS);
+            timer = setTimeout(() => finish('timeout'), TEST_TIMEOUT_MS);
         });
+        return { requestId, promise, cancel: () => cancel() };
+    }
+
+    /**
+     * 判定結果を現在のプロジェクトへ保存する。
+     * @param {string} imageId
+     * @param {MediaTestOutcome} outcome
+     */
+    function saveDisplayTestOutcome(imageId, outcome) {
+        if (!DISPLAY_RESULT[outcome.result]) return;
+        state.displayTestResults[imageId] = { result: outcome.result, testedAt: new Date().toISOString() };
+        if (outcome.format) state.displayTestResults[imageId].format = outcome.format;
+        if (outcome.result === 'available' && outcome.previewUrl) state.displayPreviewUrls[imageId] = outcome.previewUrl;
+        else delete state.displayPreviewUrls[imageId];
+        saveDisplayTestResults();
+    }
+
+    /** 実行中のリクエストと判定中表示を、同じリクエストIDの場合だけ解除する。 */
+    function clearDisplayTestRequest(imageId, requestId) {
+        const active = state.activeTestRequests.get(imageId);
+        if (!active || active.requestId !== requestId) return;
+        state.activeTestRequests.delete(imageId);
+        state.testingImageIds.delete(imageId);
+    }
+
+    /**
+     * 判定結果を保存して画面へ反映し、呼び出し元には結果名だけを返す。
+     * 古いJSONに対する結果は保存も描画もしない。
+     * @param {GyazoImage} image
+     * @param {number} requestId
+     * @param {number} requestSession
+     * @param {MediaTestOutcome} outcome
+     * @returns {'available'|'unavailable'|'timeout'|'cancelled'}
+     */
+    function applyDisplayTestOutcome(image, requestId, requestSession, outcome) {
+        clearDisplayTestRequest(image.id, requestId);
+        const isCurrent = requestSession === state.sessionVersion && state.images.some(item => item.id === image.id);
+        if (isCurrent && DISPLAY_RESULT[outcome.result]) saveDisplayTestOutcome(image.id, outcome);
+        if (isCurrent) refreshDisplayTestUi(image.id);
+        return outcome.result;
+    }
+
+    /**
+     * 画像1件の判定開始、キャンセル管理、結果反映を調整する。
+     * @param {GyazoImage} image
+     * @param {number|null} runId 一括テストの識別子。個別テストの場合はnull
+     * @returns {Promise<'available'|'unavailable'|'timeout'|'cancelled'>}
+     */
+    function performDisplayTest(image, runId) {
+        const previous = state.activeTestRequests.get(image.id);
+        if (previous) previous.cancel();
+        const requestSession = state.sessionVersion;
+        const mediaTest = createMediaTest(image.id);
+        const cancel = () => {
+            mediaTest.cancel();
+            clearDisplayTestRequest(image.id, mediaTest.requestId);
+        };
+        state.activeTestRequests.set(image.id, { requestId: mediaTest.requestId, runId, cancel });
+        state.testingImageIds.add(image.id);
+        refreshDisplayTestUi(image.id);
+        return mediaTest.promise.then(outcome => applyDisplayTestOutcome(image, mediaTest.requestId, requestSession, outcome));
     }
     function runSingleDisplayTest(image) {
         performDisplayTest(image, null);
