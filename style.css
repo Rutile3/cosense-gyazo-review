@@ -32,7 +32,20 @@ body { margin: 0; color: #20252b; background: #efefef; font-family: system-ui, -
 .item-actions { display: flex; flex-direction: column; align-items: stretch; gap: .75rem; }
 .status-select { border-left-width: 5px; }
 .status-select[data-status="unchecked"] { border-left-color: #65707c; } .status-select[data-status="completed"] { border-left-color: #198754; } .status-select[data-status="pending"] { border-left-color: #e6a100; } .status-select[data-status="excluded"] { border-left-color: #6f42c1; }
+.test-summary-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .75rem; }
+.test-summary-grid > div { padding: .75rem; border: 1px solid var(--border); border-radius: .4rem; background: #f8f9fa; }
+.test-summary-grid span, .test-summary-grid strong { display: block; }
+.test-summary-grid span { color: var(--muted); font-size: .8rem; }
+.test-summary-grid strong { margin-top: .15rem; font-size: 1.25rem; }
+.test-progress { display: flex; align-items: center; gap: .75rem; margin-top: 1rem; }
+.test-progress progress { flex: 1; min-width: 8rem; }
+.display-test-result { padding: .65rem .75rem; border-radius: .4rem; background: #f5f6f8; }
+.display-test-result strong, .display-test-result time { display: block; }
+.display-test-result[data-result="available"] { background: #dff3e8; }
+.display-test-result[data-result="unavailable"] { background: #f8d7da; }
+.display-test-result[data-result="timeout"] { background: #fff3cd; }
+.image-preview { width: 100%; max-height: 150px; margin-top: .65rem; object-fit: contain; border: 1px solid var(--border); border-radius: .35rem; background: #fff; }
 .empty-state { padding: 3rem 1rem; color: var(--muted); text-align: center; }
 .pagination-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 1rem; padding: 1rem; border-top: 1px solid var(--border); }
-@media (max-width: 767.98px) { .summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .summary-card:first-child { grid-column: 1 / -1; } .image-item { grid-template-columns: 1fr; } }
+@media (max-width: 767.98px) { .summary-grid, .test-summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .summary-card:first-child { grid-column: 1 / -1; } .image-item { grid-template-columns: 1fr; } }
 @media (max-width: 420px) { .navbar-brand { max-width: 75%; font-size: 1rem; white-space: normal; } }

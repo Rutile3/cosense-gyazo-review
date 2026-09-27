@@ -45,6 +45,36 @@
             <div class="summary-grid mb-4" aria-label="作業件数">
                 <div class="summary-card"><span>対象画像</span><strong id="count-total">0</strong></div><div class="summary-card status-unchecked"><span>未確認</span><strong id="count-unchecked">0</strong></div><div class="summary-card status-completed"><span>完了</span><strong id="count-completed">0</strong></div><div class="summary-card status-pending"><span>保留</span><strong id="count-pending">0</strong></div><div class="summary-card status-excluded"><span>対象外</span><strong id="count-excluded">0</strong></div>
             </div>
+            <section class="card shadow-sm mb-4" aria-labelledby="display-test-heading">
+                <div class="card-body">
+                    <h3 id="display-test-heading" class="h5">画像の表示テスト</h3>
+                    <p class="small text-secondary">ブラウザから <code>i.gyazo.com</code> のPNG・JPG画像を読み込みます。「表示できない」は配信停止の確定結果ではなく、画像形式、通信障害、アクセス制限、時間切れなどでも起こります。「表示できた」場合も代替画像の可能性があるため、プレビューを確認してください。</p>
+                    <div class="test-summary-grid mb-3" aria-label="表示テスト件数">
+                        <div><span>未判定</span><strong id="test-count-untested">0</strong></div>
+                        <div><span>表示できた</span><strong id="test-count-available">0</strong></div>
+                        <div><span>表示できない</span><strong id="test-count-unavailable">0</strong></div>
+                        <div><span>時間切れ</span><strong id="test-count-timeout">0</strong></div>
+                    </div>
+                    <div class="row g-3 align-items-end">
+                        <div class="col-md-5">
+                            <label for="test-scope" class="form-label">一括テストの対象</label>
+                            <select id="test-scope" class="form-select">
+                                <option value="page">現在のページ</option>
+                                <option value="filtered">検索・状況絞り込みに一致する全件</option>
+                                <option value="all">抽出した全画像</option>
+                            </select>
+                        </div>
+                        <div class="col-md-7 d-flex flex-wrap gap-2">
+                            <button id="start-display-test" type="button" class="btn btn-outline-primary">対象を順次テスト</button>
+                            <button id="stop-display-test" type="button" class="btn btn-outline-secondary" disabled>テストを停止</button>
+                        </div>
+                    </div>
+                    <div id="test-progress" class="test-progress d-none" aria-live="polite">
+                        <progress id="test-progress-bar" value="0" max="1"></progress>
+                        <span id="test-progress-text" class="small"></span>
+                    </div>
+                </div>
+            </section>
             <div class="card shadow-sm">
                 <div class="card-body border-bottom"><div class="row g-3 align-items-end">
                     <div class="col-md-5"><label for="search" class="form-label">検索</label><input id="search" type="search" class="form-control" placeholder="画像ID・ページ名・該当行を検索"></div>
