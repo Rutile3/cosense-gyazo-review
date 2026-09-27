@@ -37,13 +37,21 @@
             </div><div id="message" class="alert mt-3 mb-0 d-none" role="alert" aria-live="polite"></div></div>
         </section>
         <section id="workspace" class="d-none" aria-labelledby="project-heading">
-            <div class="d-flex flex-wrap align-items-start justify-content-between gap-3 mb-3">
-                <div><p class="text-secondary small mb-1">読み込み中のプロジェクト</p><h2 id="project-heading" class="h3 mb-0"></h2></div>
-                <div class="d-flex flex-wrap gap-2"><button id="open-next" type="button" class="btn btn-brand">次の未確認を開く</button><button id="export-csv" type="button" class="btn btn-outline-secondary">作業状況をCSV出力</button></div>
-            </div>
-            <div class="notice mb-4" role="note"><strong>「完了」は自己申告の記録です。</strong> このツールはGyazoの配信状態を確認・変更しません。画像をGyazoで確認し、公開して問題ないものだけ、Gyazo上で手動で「配信を再開する」を押してください。</div>
-            <div class="summary-grid mb-4" aria-label="作業件数">
-                <div class="summary-card"><span>対象画像</span><strong id="count-total">0</strong></div><div class="summary-card status-unchecked"><span>未確認</span><strong id="count-unchecked">0</strong></div><div class="summary-card status-completed"><span>完了</span><strong id="count-completed">0</strong></div><div class="summary-card status-pending"><span>保留</span><strong id="count-pending">0</strong></div><div class="summary-card status-excluded"><span>対象外</span><strong id="count-excluded">0</strong></div>
+            <div class="card shadow-sm mb-4">
+                <div class="card-body">
+                    <div class="d-flex flex-wrap align-items-start justify-content-between gap-3 mb-3">
+                        <div><p class="text-secondary small mb-1">読み込み中のプロジェクト</p><h2 id="project-heading" class="h3 mb-0"></h2></div>
+                        <div class="d-flex flex-wrap gap-2"><button id="open-next" type="button" class="btn btn-brand">次の未確認を開く</button><button id="export-csv" type="button" class="btn btn-outline-secondary">作業状況をCSV出力</button></div>
+                    </div>
+                    <div class="notice mb-4" role="note">
+                        <strong>「完了」は自己申告の記録です。</strong><br>
+                        このツールはGyazoの配信状態を確認・変更しません。<br>
+                        画像をGyazoで確認し、公開して問題ないものだけ、Gyazo上で手動で「配信を再開する」を押してください。
+                    </div>
+                    <div class="summary-grid" aria-label="作業件数">
+                        <div class="summary-card"><span>対象画像</span><strong id="count-total">0</strong></div><div class="summary-card status-unchecked"><span>未確認</span><strong id="count-unchecked">0</strong></div><div class="summary-card status-completed"><span>完了</span><strong id="count-completed">0</strong></div><div class="summary-card status-pending"><span>保留</span><strong id="count-pending">0</strong></div><div class="summary-card status-excluded"><span>対象外</span><strong id="count-excluded">0</strong></div>
+                    </div>
+                </div>
             </div>
             <section class="card shadow-sm mb-4" aria-labelledby="display-test-heading">
                 <div class="card-body">
