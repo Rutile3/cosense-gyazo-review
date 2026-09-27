@@ -100,7 +100,7 @@
             if (!stored || typeof stored !== 'object' || Array.isArray(stored)) return {};
             return Object.fromEntries(Object.entries(stored).filter(([id, value]) =>
                 validImageIds.has(id) && value && DISPLAY_RESULT[value.result] && typeof value.testedAt === 'string' &&
-                (value.format === undefined || value.format === 'png' || value.format === 'jpg')
+                (value.format === undefined || ['png', 'jpg', 'gif', 'mp4'].includes(value.format))
             ));
         } catch (error) {
             showMessage('保存済みの表示テスト結果を読み込めませんでした。表示結果は未判定として扱います。', 'warning');
@@ -156,12 +156,19 @@
             resultBox.append(testedAt);
         }
         if (result && result.result === 'available') {
-            const preview = document.createElement('img');
+            const preview = document.createElement(result.format === 'mp4' ? 'video' : 'img');
             preview.className = 'image-preview';
             preview.src = displayPreviewUrls[image.id] || getDisplayImageUrl(image.id, result.format || 'png', false);
-            preview.alt = `${image.id} の表示テスト時点のプレビュー`;
-            preview.loading = 'lazy';
-            preview.decoding = 'async';
+            if (result.format === 'mp4') {
+                preview.controls = true;
+                preview.muted = true;
+                preview.preload = 'metadata';
+                preview.setAttribute('aria-label', `${image.id} の表示テスト時点の動画プレビュー`);
+            } else {
+                preview.alt = `${image.id} の表示テスト時点のプレビュー`;
+                preview.loading = 'lazy';
+                preview.decoding = 'async';
+            }
             preview.addEventListener('error', () => preview.remove());
             resultBox.append(preview);
         }
@@ -263,7 +270,7 @@
         refreshDisplayTestUi(image.id);
 
         return new Promise(resolve => {
-            const formats = ['png', 'jpg'];
+            const formats = ['png', 'jpg', 'gif', 'mp4'];
             const loaders = [];
             const testUrls = Object.fromEntries(formats.map(format => [format, getDisplayImageUrl(image.id, format, true)]));
             let errorCount = 0;
@@ -273,10 +280,18 @@
                 if (settled) return;
                 settled = true;
                 clearTimeout(timer);
-                loaders.forEach(loader => {
-                    loader.onload = null;
-                    loader.onerror = null;
-                    if (outcome === 'available' || outcome === 'cancelled') loader.src = '';
+                loaders.forEach(({ element, isVideo }) => {
+                    element.onload = null;
+                    element.onerror = null;
+                    element.onloadedmetadata = null;
+                    if (outcome === 'available' || outcome === 'cancelled' || outcome === 'timeout') {
+                        if (isVideo) {
+                            element.removeAttribute('src');
+                            element.load();
+                        } else {
+                            element.src = '';
+                        }
+                    }
                 });
                 const active = activeTestRequests.get(image.id);
                 if (active && active.requestId === requestId) {
@@ -299,9 +314,17 @@
             };
             activeTestRequests.set(image.id, { requestId, runId, cancel });
             formats.forEach(format => {
-                const loader = new Image();
-                loaders.push(loader);
-                loader.onload = () => finish('available', format, true);
+                const isVideo = format === 'mp4';
+                const loader = isVideo ? document.createElement('video') : new Image();
+                loaders.push({ element: loader, isVideo });
+                if (isVideo) {
+                    loader.preload = 'metadata';
+                    loader.muted = true;
+                    loader.playsInline = true;
+                    loader.onloadedmetadata = () => finish('available', format, true);
+                } else {
+                    loader.onload = () => finish('available', format, true);
+                }
                 loader.onerror = () => {
                     errorCount += 1;
                     if (errorCount === formats.length) finish('unavailable', null, true);
