@@ -16,14 +16,20 @@
      */
 
     /**
+     * @typedef {'png'|'jpg'|'gif'|'mp4'} DisplayTestFormat
+     */
+
+    /**
      * @typedef {Object} DisplayTestResult
      * @property {'available'|'unavailable'|'timeout'} result
      * @property {string} testedAt ISO 8601形式の検査日時
-     * @property {'png'|'jpg'|'gif'|'mp4'} [format] 表示できた形式
+     * @property {DisplayTestFormat} [format] 表示できた形式
      */
 
     // 表示テストはHTTPステータスではなく、ブラウザのメディア読込イベントで判定する。
     const DISPLAY_RESULT = Object.freeze({ available: '表示できた', unavailable: '表示できない', timeout: '時間切れ' });
+    /** @type {ReadonlyArray<DisplayTestFormat>} */
+    const DISPLAY_FORMATS = Object.freeze(['png', 'jpg', 'gif', 'mp4']);
     const TEST_STORAGE_PREFIX = 'cosense-gyazo-review:display-tests:v1:';
     const TEST_TIMEOUT_MS = 12000;
     const TEST_CONCURRENCY = 3;
@@ -144,7 +150,7 @@
             if (!stored || typeof stored !== 'object' || Array.isArray(stored)) return {};
             return Object.fromEntries(Object.entries(stored).filter(([id, value]) =>
                 validImageIds.has(id) && value && DISPLAY_RESULT[value.result] && typeof value.testedAt === 'string' &&
-                (value.format === undefined || ['png', 'jpg', 'gif', 'mp4'].includes(value.format))
+                (value.format === undefined || DISPLAY_FORMATS.includes(value.format))
             ));
         } catch (error) {
             showMessage('保存済みの表示テスト結果を読み込めませんでした。表示結果は未判定として扱います。', 'warning');
@@ -173,7 +179,7 @@
      * 表示テスト用のi.gyazo.com URLを生成する。
      * 再テスト時はキャッシュ回避用クエリを付けるが、画像ID自体は変更しない。
      * @param {string} id
-     * @param {'png'|'jpg'|'gif'|'mp4'} format
+     * @param {DisplayTestFormat} format
      * @param {boolean} cacheBust
      * @returns {string}
      */
@@ -371,9 +377,8 @@
         refreshDisplayTestUi(image.id);
 
         return new Promise(resolve => {
-            const formats = ['png', 'jpg', 'gif', 'mp4'];
             const loaders = [];
-            const testUrls = Object.fromEntries(formats.map(format => [format, getDisplayImageUrl(image.id, format, true)]));
+            const testUrls = Object.fromEntries(DISPLAY_FORMATS.map(format => [format, getDisplayImageUrl(image.id, format, true)]));
             let errorCount = 0;
             let settled = false;
             let timer;
@@ -414,7 +419,7 @@
                 finish('cancelled', null, false);
             };
             activeTestRequests.set(image.id, { requestId, runId, cancel });
-            formats.forEach(format => {
+            DISPLAY_FORMATS.forEach(format => {
                 const isVideo = format === 'mp4';
                 const loader = isVideo ? document.createElement('video') : new Image();
                 loaders.push({ element: loader, isVideo });
@@ -428,7 +433,7 @@
                 }
                 loader.onerror = () => {
                     errorCount += 1;
-                    if (errorCount === formats.length) finish('unavailable', null, true);
+                    if (errorCount === DISPLAY_FORMATS.length) finish('unavailable', null, true);
                 };
                 loader.src = testUrls[format];
             });
