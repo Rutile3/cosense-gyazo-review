@@ -83,7 +83,10 @@
                                 <button id="start-display-test" type="button" class="btn btn-primary">対象を順次テスト</button>
                                 <button id="stop-display-test" type="button" class="btn btn-outline-secondary d-none" disabled>テストを停止</button>
                             </div>
-                            <button id="export-csv" type="button" class="btn btn-outline-secondary">表示テスト結果をCSV出力</button>
+                            <div class="test-secondary-actions">
+                                <button id="export-csv" type="button" class="btn btn-outline-secondary">表示テスト結果をCSV出力</button>
+                                <button id="clear-display-test-results" type="button" class="btn btn-outline-danger" disabled>保存済み結果を消去</button>
+                            </div>
                         </div>
                     </div>
                     <div id="test-progress" class="test-progress d-none" aria-live="polite">

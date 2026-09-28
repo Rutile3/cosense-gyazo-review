@@ -154,6 +154,7 @@
             }
         ],
         exportCsv: getRequiredElement('export-csv'),
+        clearDisplayTestResults: getRequiredElement('clear-display-test-results'),
         visibleCount: getRequiredElement('visible-count'),
         testScope: getRequiredElement('test-scope'),
         startDisplayTest: getRequiredElement('start-display-test'),
@@ -223,6 +224,12 @@
         } else {
             delete state.displayPreviewUrls[imageId];
         }
+    }
+
+    /** 表示テスト結果とセッション内のプレビューを未判定の状態へ戻す。 */
+    function resetDisplayTestResults() {
+        state.displayTestResults = {};
+        state.displayPreviewUrls = {};
     }
 
     /**
@@ -510,6 +517,10 @@
         Object.entries(counts).forEach(([key, value]) => {
             elements.testCounts[key].textContent = value;
         });
+        const storedResultCount = state.images.length - counts.untested;
+        elements.clearDisplayTestResults.disabled = storedResultCount === 0
+            || Boolean(state.batchRun)
+            || state.activeTestRequests.size > 0;
     }
     function updateTestFilterButtons() {
         elements.testFilterButtons.forEach(button => {
@@ -655,6 +666,7 @@
         elements.startDisplayTest.disabled = isRunning;
         elements.stopDisplayTest.disabled = !isRunning;
         elements.stopDisplayTest.classList.toggle('d-none', !isRunning);
+        if (isRunning) elements.clearDisplayTestResults.disabled = true;
         if (!isRunning) updateTestScopeButton();
     }
 
@@ -812,6 +824,32 @@
         downloadCsv(csvText, fileName);
     }
 
+    /** 現在のプロジェクトに保存された表示テスト結果を確認後に消去する。 */
+    function clearStoredDisplayTestResults() {
+        if (!state.currentProject || state.batchRun || state.activeTestRequests.size > 0) return;
+        const storedResultCount = state.images.filter(image => {
+            const result = state.displayTestResults[image.id];
+            return result && isStoredDisplayTestResult(result.result);
+        }).length;
+        if (storedResultCount === 0) return;
+        const confirmed = window.confirm(
+            '現在読み込んでいるプロジェクトの保存済み表示テスト結果をすべて消去し、未判定に戻します。\n\n'
+            + 'この操作は元に戻せません。よろしいですか？'
+        );
+        if (!confirmed) return;
+        flushPendingBatchUpdates({ refreshUi: false });
+        try {
+            localStorage.removeItem(getTestStorageKey(state.currentProject));
+        } catch (error) {
+            showMessage('保存済みの表示テスト結果を消去できませんでした。ブラウザの保存設定を確認してください。', 'warning');
+            return;
+        }
+        resetDisplayTestResults();
+        updateDisplayTestSummary();
+        renderList();
+        showMessage('保存済みの表示テスト結果を消去し、すべて未判定に戻しました。', 'success');
+    }
+
     /** 保留中の検索結果更新を取り消す。 */
     function cancelPendingSearchRender() {
         if (searchRenderTimer === null) return;
@@ -888,6 +926,7 @@
             controls.last.addEventListener('click', moveToLastPage);
         });
         elements.exportCsv.addEventListener('click', exportCsv);
+        elements.clearDisplayTestResults.addEventListener('click', clearStoredDisplayTestResults);
     }
 
     window.CosenseGyazoReview = Object.freeze({

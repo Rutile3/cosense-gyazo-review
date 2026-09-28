@@ -243,7 +243,8 @@ body {
     gap: .5rem 1rem;
 }
 
-.test-primary-actions {
+.test-primary-actions,
+.test-secondary-actions {
     display: flex;
     flex-wrap: wrap;
     gap: .5rem;
