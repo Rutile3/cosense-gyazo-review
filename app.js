@@ -485,13 +485,6 @@
         actionCell.dataset.label = '操作';
         const actions = document.createElement('div');
         actions.className = 'item-actions';
-        const open = document.createElement('a');
-        open.className = 'btn btn-outline-primary';
-        open.href = image.url;
-        open.target = '_blank';
-        open.rel = 'noopener noreferrer';
-        open.textContent = 'Gyazoで開く';
-        actions.append(open);
         actions.append(createDisplayTestButton(image, result, isTesting));
         actionCell.append(actions);
 
