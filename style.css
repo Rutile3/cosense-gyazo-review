@@ -133,20 +133,58 @@ body {
 }
 
 /* 抽出した画像と掲載元の一覧 */
-.image-list {
-    display: grid;
+.result-table-container {
+    overflow-x: auto;
 }
 
-.image-item {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) 190px;
-    gap: 1rem 1.5rem;
-    padding: 1.25rem;
+.result-table {
+    width: 100%;
+    min-width: 900px;
+    border-collapse: collapse;
+    table-layout: fixed;
+}
+
+.result-table-caption {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+.result-table th,
+.result-table td {
+    padding: 1rem;
     border-bottom: 1px solid var(--border);
+    text-align: left;
+    vertical-align: top;
 }
 
-.image-item:last-child {
-    border-bottom: 0;
+.result-table th {
+    color: var(--muted);
+    background: #f5f6f8;
+    font-size: .875rem;
+    font-weight: 600;
+}
+
+.result-table th:nth-child(1) {
+    width: 18%;
+}
+
+.result-table th:nth-child(2) {
+    width: 39%;
+}
+
+.result-table th:nth-child(3) {
+    width: 25%;
+}
+
+.result-table th:nth-child(4) {
+    width: 18%;
 }
 
 .image-id {
@@ -333,7 +371,7 @@ body {
     border-bottom: 1px solid var(--border);
 }
 
-/* 狭い画面では操作を縦並びにし、一覧を1カラムで表示する */
+/* 狭い画面では操作と表の各行をカード風に縦積みする */
 @media (max-width: 767.98px) {
     .input-compact-header {
         align-items: stretch;
@@ -358,8 +396,57 @@ body {
         width: 100%;
     }
 
-    .image-item {
-        grid-template-columns: 1fr;
+    .result-table {
+        min-width: 0;
+    }
+
+    .result-table thead {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        margin: -1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+        border: 0;
+    }
+
+    .result-table,
+    .result-table tbody,
+    .result-table tr,
+    .result-table td {
+        display: block;
+        width: 100%;
+    }
+
+    .result-table tbody {
+        display: grid;
+        gap: 1rem;
+        padding: 1rem;
+    }
+
+    .result-table .image-item {
+        overflow: hidden;
+        border: 1px solid var(--border);
+        border-radius: .5rem;
+    }
+
+    .result-table td {
+        border-bottom: 1px solid var(--border);
+    }
+
+    .result-table td::before {
+        display: block;
+        margin-bottom: .4rem;
+        color: var(--muted);
+        content: attr(data-label);
+        font-size: .8rem;
+        font-weight: 600;
+    }
+
+    .result-table .image-item td:last-child {
+        border-bottom: 0;
     }
 }
 

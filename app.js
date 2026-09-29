@@ -130,6 +130,7 @@
         message: getRequiredElement('message'),
         workspace: getRequiredElement('workspace'),
         projectHeading: getRequiredElement('project-heading'),
+        resultTableContainer: getRequiredElement('result-table-container'),
         imageList: getRequiredElement('image-list'),
         emptyFilter: getRequiredElement('empty-filter'),
         search: getRequiredElement('search'),
@@ -402,7 +403,7 @@
     function createDisplayTestButton(image, result, isTesting) {
         const button = document.createElement('button');
         button.type = 'button';
-        button.className = 'btn btn-outline-secondary mt-2';
+        button.className = 'btn btn-outline-secondary';
         button.disabled = isTesting || Boolean(state.batchRun);
         button.textContent = isTesting ? 'テスト中…' : (state.batchRun ? '一括テスト中' : (result ? '再テスト' : '表示をテスト'));
         button.addEventListener('click', () => runSingleDisplayTest(image));
@@ -410,43 +411,44 @@
     }
 
     /**
-     * 画像1件分の表示テスト結果、プレビュー、操作ボタンを組み立てる。
+     * 画像ID、掲載元、表示テスト結果、操作を含む表の1行を生成する。
      * @param {GyazoImage} image
-     * @returns {HTMLDivElement}
-     */
-    function createDisplayTestElement(image) {
-        const container = document.createElement('div');
-        const result = state.displayTestResults[image.id];
-        const isTesting = state.testingImageIds.has(image.id);
-        const resultBox = createDisplayTestResultElement(result, isTesting);
-        const preview = createDisplayTestPreview(image, result);
-        if (preview) resultBox.append(preview);
-        container.append(resultBox, createDisplayTestButton(image, result, isTesting));
-        return container;
-    }
-
-    /**
-     * 掲載元と表示テスト操作を含む、一覧の画像1件分を生成する。
-     * @param {GyazoImage} image
-     * @returns {HTMLElement}
+     * @returns {HTMLTableRowElement}
      */
     function createImageElement(image) {
-        const article = document.createElement('article');
-        article.className = 'image-item';
-        article.dataset.imageId = image.id;
-        const details = document.createElement('div');
+        const row = document.createElement('tr');
+        row.className = 'image-item';
+        row.dataset.imageId = image.id;
+
+        const idCell = document.createElement('td');
+        idCell.dataset.label = '画像ID';
         const idLabel = document.createElement('div');
         idLabel.className = 'image-id';
         idLabel.textContent = image.id;
-        details.append(idLabel);
+        idCell.append(idLabel);
+
+        const sourceCell = document.createElement('td');
+        sourceCell.dataset.label = '掲載元';
         const heading = document.createElement('div');
-        heading.className = 'small fw-semibold mt-3';
+        heading.className = 'small fw-semibold';
         heading.textContent = `掲載元 ${image.sources.length}件`;
-        details.append(heading);
+        sourceCell.append(heading);
         const list = document.createElement('ul');
         list.className = 'source-list';
         image.sources.forEach(source => list.append(createSourceElement(source)));
-        details.append(list);
+        sourceCell.append(list);
+
+        const result = state.displayTestResults[image.id];
+        const isTesting = state.testingImageIds.has(image.id);
+        const resultCell = document.createElement('td');
+        resultCell.dataset.label = '表示テスト結果';
+        const resultBox = createDisplayTestResultElement(result, isTesting);
+        const preview = createDisplayTestPreview(image, result);
+        if (preview) resultBox.append(preview);
+        resultCell.append(resultBox);
+
+        const actionCell = document.createElement('td');
+        actionCell.dataset.label = '操作';
         const actions = document.createElement('div');
         actions.className = 'item-actions';
         const open = document.createElement('a');
@@ -456,9 +458,11 @@
         open.rel = 'noopener noreferrer';
         open.textContent = 'Gyazoで開く';
         actions.append(open);
-        actions.append(createDisplayTestElement(image));
-        article.append(details, actions);
-        return article;
+        actions.append(createDisplayTestButton(image, result, isTesting));
+        actionCell.append(actions);
+
+        row.append(idCell, sourceCell, resultCell, actionCell);
+        return row;
     }
 
     /** DOMの入力値を純粋な一覧計算へ渡し、現在の表示内容を返す。 */
@@ -491,6 +495,7 @@
         const fragment = document.createDocumentFragment();
         view.items.forEach(image => fragment.append(createImageElement(image)));
         elements.imageList.replaceChildren(fragment);
+        elements.resultTableContainer.classList.toggle('d-none', view.filtered.length === 0);
         elements.emptyFilter.classList.toggle('d-none', view.filtered.length !== 0);
         elements.visibleCount.textContent = view.filtered.length === 0
             ? `0 / ${state.images.length}件`
