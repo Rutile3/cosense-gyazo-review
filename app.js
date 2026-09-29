@@ -422,18 +422,17 @@
     }
 
     /**
-     * 画像1件の表示テストまたは再テストを開始するボタンを生成する。
+     * 画像1件の表示テストを開始するボタンを生成する。
      * @param {GyazoImage} image
-     * @param {DisplayTestResult|undefined} result
      * @param {boolean} isTesting
      * @returns {HTMLButtonElement}
      */
-    function createDisplayTestButton(image, result, isTesting) {
+    function createDisplayTestButton(image, isTesting) {
         const button = document.createElement('button');
         button.type = 'button';
         button.className = 'btn btn-outline-secondary';
         button.disabled = isTesting || Boolean(state.batchRun);
-        button.textContent = isTesting ? 'テスト中…' : (state.batchRun ? '一括テスト中' : (result ? '再テスト' : '表示をテスト'));
+        button.textContent = isTesting ? 'テスト中…' : (state.batchRun ? '一括テスト中' : '表示テスト');
         button.addEventListener('click', () => runSingleDisplayTest(image));
         return button;
     }
@@ -485,7 +484,7 @@
         actionCell.dataset.label = '操作';
         const actions = document.createElement('div');
         actions.className = 'item-actions';
-        actions.append(createDisplayTestButton(image, result, isTesting));
+        actions.append(createDisplayTestButton(image, isTesting));
         actionCell.append(actions);
 
         row.append(idCell, sourceCell, resultCell, actionCell);
