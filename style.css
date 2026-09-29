@@ -192,6 +192,18 @@ body {
     font: .9rem ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
 
+.source-details summary {
+    border-radius: .25rem;
+    cursor: pointer;
+    font-size: .875rem;
+    font-weight: 600;
+}
+
+.source-details summary:focus-visible {
+    outline: 3px solid rgba(13, 110, 253, .25);
+    outline-offset: 2px;
+}
+
 .source-list {
     margin: .8rem 0 0;
     padding: 0;

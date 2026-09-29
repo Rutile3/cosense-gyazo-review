@@ -93,6 +93,7 @@
      * @property {BatchRun|null} batchRun
      * @property {Map<string, {requestId: number, runId: number|null, cancel: Function}>} activeTestRequests
      * @property {Set<string>} testingImageIds
+     * @property {Set<string>} expandedSourceImageIds
      */
 
     const TEST_STORAGE_PREFIX = 'cosense-gyazo-review:display-tests:v1:';
@@ -182,7 +183,9 @@
         batchSequence: 0,
         batchRun: null,
         activeTestRequests: new Map(),
-        testingImageIds: new Set()
+        testingImageIds: new Set(),
+        // 掲載元の開閉状態は現在のセッションだけで使い、localStorageには保存しない。
+        expandedSourceImageIds: new Set()
     };
 
     /**
@@ -246,6 +249,7 @@
             new Set(images.map(image => image.id))
         );
         state.displayPreviewUrls = {};
+        state.expandedSourceImageIds.clear();
         setCurrentPage(1);
     }
 
@@ -429,14 +433,22 @@
 
         const sourceCell = document.createElement('td');
         sourceCell.dataset.label = '掲載元';
-        const heading = document.createElement('div');
-        heading.className = 'small fw-semibold';
-        heading.textContent = `掲載元 ${image.sources.length}件`;
-        sourceCell.append(heading);
+        const sourceDetails = document.createElement('details');
+        sourceDetails.className = 'source-details';
+        sourceDetails.open = state.expandedSourceImageIds.has(image.id);
+        const sourceSummary = document.createElement('summary');
+        sourceSummary.textContent = `掲載元 ${image.sources.length}件`;
         const list = document.createElement('ul');
         list.className = 'source-list';
         image.sources.forEach(source => list.append(createSourceElement(source)));
-        sourceCell.append(list);
+        sourceDetails.append(sourceSummary, list);
+        const sourceSession = state.sessionVersion;
+        sourceDetails.addEventListener('toggle', () => {
+            if (sourceSession !== state.sessionVersion) return;
+            if (sourceDetails.open) state.expandedSourceImageIds.add(image.id);
+            else state.expandedSourceImageIds.delete(image.id);
+        });
+        sourceCell.append(sourceDetails);
 
         const result = state.displayTestResults[image.id];
         const isTesting = state.testingImageIds.has(image.id);
