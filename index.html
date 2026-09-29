@@ -31,10 +31,22 @@
     </header>
     <main class="flex-fill container-xl my-4">
         <section class="card shadow-sm mb-4" aria-labelledby="input-heading">
-            <div id="input-expanded" class="card-body p-4"><div class="row align-items-center g-4">
-                <div class="col-lg-7"><h1 id="input-heading" class="h3 mb-2">エクスポートJSONを読み込む</h1><p class="text-secondary mb-0">ファイルはこのブラウザ内だけで解析します。JSON本文やページ内容を外部へ送信・保存しません。</p></div>
-                <div class="col-lg-5"><label id="drop-zone" class="drop-zone" for="file-input" tabindex="0"><span class="drop-zone-title">ここにJSONをドロップ</span><span class="small text-secondary">またはクリックしてファイルを選択</span><input id="file-input" type="file" accept=".json,application/json" hidden></label></div>
-            </div><div id="message" class="alert mt-3 mb-0 d-none" role="alert" aria-live="polite"></div></div>
+            <div id="input-expanded" class="card-body p-4">
+                <div class="row align-items-center g-4">
+                    <div class="col-lg-7">
+                        <h1 id="input-heading" class="h3 mb-2">エクスポートJSONを読み込む</h1>
+                        <p class="text-secondary mb-0">ファイルはこのブラウザ内だけで解析します。JSON本文やページ内容を外部へ送信・保存しません。</p>
+                    </div>
+                    <div class="col-lg-5">
+                        <label id="drop-zone" class="drop-zone" for="file-input" tabindex="0">
+                            <span class="drop-zone-title">ここにJSONをドロップ</span>
+                            <span class="small text-secondary">またはクリックしてファイルを選択</span>
+                            <input id="file-input" type="file" accept=".json,application/json" hidden>
+                        </label>
+                    </div>
+                </div>
+                <div id="message" class="alert mt-3 mb-0 d-none" role="alert" aria-live="polite"></div>
+            </div>
             <div id="input-compact" class="card-body input-compact d-none">
                 <div class="input-compact-header">
                     <div>
@@ -64,10 +76,22 @@
                         </ul>
                     </details>
                     <div class="test-summary-grid mb-3" aria-label="表示テスト件数">
-                        <button type="button" class="test-summary-card" data-test-filter="untested" aria-pressed="false"><span>未判定</span><strong id="test-count-untested">0</strong></button>
-                        <button type="button" class="test-summary-card" data-test-filter="available" aria-pressed="false"><span>表示できた</span><strong id="test-count-available">0</strong></button>
-                        <button type="button" class="test-summary-card" data-test-filter="unavailable" aria-pressed="false"><span>表示できない</span><strong id="test-count-unavailable">0</strong></button>
-                        <button type="button" class="test-summary-card" data-test-filter="timeout" aria-pressed="false"><span>時間切れ</span><strong id="test-count-timeout">0</strong></button>
+                        <button type="button" class="test-summary-card" data-test-filter="untested" aria-pressed="false">
+                            <span>未判定</span>
+                            <strong id="test-count-untested">0</strong>
+                        </button>
+                        <button type="button" class="test-summary-card" data-test-filter="available" aria-pressed="false">
+                            <span>表示できた</span>
+                            <strong id="test-count-available">0</strong>
+                        </button>
+                        <button type="button" class="test-summary-card" data-test-filter="unavailable" aria-pressed="false">
+                            <span>表示できない</span>
+                            <strong id="test-count-unavailable">0</strong>
+                        </button>
+                        <button type="button" class="test-summary-card" data-test-filter="timeout" aria-pressed="false">
+                            <span>時間切れ</span>
+                            <strong id="test-count-timeout">0</strong>
+                        </button>
                     </div>
                     <div class="row g-3 align-items-end">
                         <div class="col-md-5">
@@ -96,12 +120,37 @@
                 </div>
             </div>
             <div class="card shadow-sm">
-                <div class="card-body border-bottom"><div class="row g-3 align-items-end">
-                    <div class="col-md-5"><label for="search" class="form-label">検索</label><input id="search" type="search" class="form-control" placeholder="画像ID・ページ名・該当行を検索"></div>
-                    <div class="col-md-3"><label for="test-result-filter" class="form-label">表示テスト結果</label><select id="test-result-filter" class="form-select"><option value="all">すべて</option><option value="untested">未判定</option><option value="available">表示できた</option><option value="unavailable">表示できない</option><option value="timeout">時間切れ</option></select></div>
-                    <div class="col-md-2"><label for="page-size" class="form-label">表示件数</label><select id="page-size" class="form-select"><option value="10">10件</option><option value="20" selected>20件</option><option value="50">50件</option><option value="100">100件</option><option value="all">全件</option></select></div>
-                    <div class="col-md-2 text-md-end"><span id="visible-count" class="small text-secondary"></span></div>
-                </div></div>
+                <div class="card-body border-bottom">
+                    <div class="row g-3 align-items-end">
+                        <div class="col-md-5">
+                            <label for="search" class="form-label">検索</label>
+                            <input id="search" type="search" class="form-control" placeholder="画像ID・ページ名・該当行を検索">
+                        </div>
+                        <div class="col-md-3">
+                            <label for="test-result-filter" class="form-label">表示テスト結果</label>
+                            <select id="test-result-filter" class="form-select">
+                                <option value="all">すべて</option>
+                                <option value="untested">未判定</option>
+                                <option value="available">表示できた</option>
+                                <option value="unavailable">表示できない</option>
+                                <option value="timeout">時間切れ</option>
+                            </select>
+                        </div>
+                        <div class="col-md-2">
+                            <label for="page-size" class="form-label">表示件数</label>
+                            <select id="page-size" class="form-select">
+                                <option value="10">10件</option>
+                                <option value="20" selected>20件</option>
+                                <option value="50">50件</option>
+                                <option value="100">100件</option>
+                                <option value="all">全件</option>
+                            </select>
+                        </div>
+                        <div class="col-md-2 text-md-end">
+                            <span id="visible-count" class="small text-secondary"></span>
+                        </div>
+                    </div>
+                </div>
                 <nav id="top-pagination" class="pagination-bar" aria-label="結果一覧上部のページ送り">
                     <div class="pagination-actions">
                         <button id="top-first-page" type="button" class="btn btn-outline-secondary">先頭へ</button>
@@ -113,7 +162,8 @@
                         <button id="top-last-page" type="button" class="btn btn-outline-secondary">末尾へ</button>
                     </div>
                 </nav>
-                <div id="image-list" class="image-list" aria-live="polite"></div><div id="empty-filter" class="empty-state d-none">条件に一致する画像はありません。</div>
+                <div id="image-list" class="image-list" aria-live="polite"></div>
+                <div id="empty-filter" class="empty-state d-none">条件に一致する画像はありません。</div>
                 <nav id="bottom-pagination" class="pagination-bar" aria-label="結果一覧下部のページ送り">
                     <div class="pagination-actions">
                         <button id="first-page" type="button" class="btn btn-outline-secondary">先頭へ</button>
