@@ -94,6 +94,7 @@
      * @property {Map<string, {requestId: number, runId: number|null, cancel: Function}>} activeTestRequests
      * @property {Set<string>} testingImageIds
      * @property {Set<string>} expandedSourceImageIds
+     * @property {Set<string>} expandedDisplayTestImageIds
      */
 
     const TEST_STORAGE_PREFIX = 'cosense-gyazo-review:display-tests:v1:';
@@ -185,7 +186,9 @@
         activeTestRequests: new Map(),
         testingImageIds: new Set(),
         // 掲載元の開閉状態は現在のセッションだけで使い、localStorageには保存しない。
-        expandedSourceImageIds: new Set()
+        expandedSourceImageIds: new Set(),
+        // 表示テスト詳細の開閉状態も現在のセッションだけで使う。
+        expandedDisplayTestImageIds: new Set()
     };
 
     /**
@@ -234,6 +237,7 @@
     function resetDisplayTestResults() {
         state.displayTestResults = {};
         state.displayPreviewUrls = {};
+        state.expandedDisplayTestImageIds.clear();
     }
 
     /**
@@ -250,6 +254,7 @@
         );
         state.displayPreviewUrls = {};
         state.expandedSourceImageIds.clear();
+        state.expandedDisplayTestImageIds.clear();
         setCurrentPage(1);
     }
 
@@ -349,12 +354,13 @@
     }
 
     /**
-     * 判定名と検査日時を表示する要素を生成する。
+     * 判定名を見出しとして、検査日時とプレビューを折りたたむ要素を生成する。
+     * @param {GyazoImage} image
      * @param {DisplayTestResult|undefined} result
      * @param {boolean} isTesting
      * @returns {HTMLDivElement}
      */
-    function createDisplayTestResultElement(result, isTesting) {
+    function createDisplayTestResultElement(image, result, isTesting) {
         const resultBox = document.createElement('div');
         resultBox.className = 'display-test-result small';
         resultBox.dataset.result = isTesting ? 'testing' : (result ? result.result : 'untested');
@@ -362,13 +368,31 @@
         const formatLabel = result && result.result === 'available' && result.format ? `（${result.format.toUpperCase()}）` : '';
         const resultDefinition = getDisplayTestResultDefinition(result?.result) || DISPLAY_TEST_RESULT_CONFIG.untested;
         resultLabel.textContent = isTesting ? '判定中…' : `${resultDefinition.label}${formatLabel}`;
-        resultBox.append(resultLabel);
-        if (result) {
-            const testedAt = document.createElement('time');
-            testedAt.dateTime = result.testedAt;
-            testedAt.textContent = `検査時点: ${formatTestedAt(result.testedAt)}`;
-            resultBox.append(testedAt);
+        if (!result) {
+            resultBox.append(resultLabel);
+            return resultBox;
         }
+        const details = document.createElement('details');
+        details.className = 'display-test-details';
+        details.open = state.expandedDisplayTestImageIds.has(image.id);
+        const summary = document.createElement('summary');
+        summary.append(resultLabel);
+        const content = document.createElement('div');
+        content.className = 'display-test-details-content';
+        const testedAt = document.createElement('time');
+        testedAt.dateTime = result.testedAt;
+        testedAt.textContent = `検査時点: ${formatTestedAt(result.testedAt)}`;
+        content.append(testedAt);
+        const preview = createDisplayTestPreview(image, result);
+        if (preview) content.append(preview);
+        details.append(summary, content);
+        const detailsSession = state.sessionVersion;
+        details.addEventListener('toggle', () => {
+            if (detailsSession !== state.sessionVersion) return;
+            if (details.open) state.expandedDisplayTestImageIds.add(image.id);
+            else state.expandedDisplayTestImageIds.delete(image.id);
+        });
+        resultBox.append(details);
         return resultBox;
     }
 
@@ -454,9 +478,7 @@
         const isTesting = state.testingImageIds.has(image.id);
         const resultCell = document.createElement('td');
         resultCell.dataset.label = '表示テスト結果';
-        const resultBox = createDisplayTestResultElement(result, isTesting);
-        const preview = createDisplayTestPreview(image, result);
-        if (preview) resultBox.append(preview);
+        const resultBox = createDisplayTestResultElement(image, result, isTesting);
         resultCell.append(resultBox);
 
         const actionCell = document.createElement('td');

@@ -323,6 +323,24 @@ body {
     display: block;
 }
 
+.display-test-details summary {
+    border-radius: .25rem;
+    cursor: pointer;
+}
+
+.display-test-details summary strong {
+    display: inline;
+}
+
+.display-test-details summary:focus-visible {
+    outline: 3px solid rgba(13, 110, 253, .25);
+    outline-offset: 2px;
+}
+
+.display-test-details-content {
+    margin-top: .45rem;
+}
+
 .display-test-result[data-result="available"] {
     background: #dff3e8;
 }
